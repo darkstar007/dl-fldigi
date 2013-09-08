@@ -1632,6 +1632,8 @@ SoundPulse::SoundPulse(const char *dev)
 	memset(snd_buffer, 0, sd[0].stream_params.channels * SND_BUF_LEN * sizeof(*snd_buffer));
 	memset(src_buffer, 0, sd[1].stream_params.channels * SND_BUF_LEN * sizeof(*src_buffer));
 	memset(fbuf, 0, MAX(sd[0].stream_params.channels, sd[1].stream_params.channels) * SND_BUF_LEN * sizeof(*fbuf));
+	fd = -1;
+
 }
 
 SoundPulse::~SoundPulse()
@@ -1655,6 +1657,7 @@ int SoundPulse::Open(int mode, int freq)
 			      progdefaults.PulseServer.c_str() : NULL);
 	char sname[32];
 	int err;
+	std::cout << "freq = " << freq << std::endl;
 
 	sample_frequency = freq;
 	for (int i = 0; i < 2; i++) {
@@ -1674,6 +1677,13 @@ int SoundPulse::Open(int mode, int freq)
 		if (!sd[i].stream)
 			throw SndPulseException(err);
 	}
+	if (fd == -1) {
+	     fd = open("/data/matt/mygnuradio/gnuradio_pipe_8k.raw", O_RDONLY);
+	     if (fd < 0) {
+		  perror("open");
+		  exit(10);
+	     }
+	}
 
 	return 0;
 }
@@ -1682,6 +1692,7 @@ void SoundPulse::Close(unsigned dir)
 {
 	if (dir == 1 || dir == UINT_MAX)
 		flush(1);
+	close(fd);
 	Abort(dir);
 }
 
@@ -1847,6 +1858,7 @@ size_t SoundPulse::Read(float *buf, size_t count)
 	}
 #endif
 
+#ifdef DONT_DO
 	if (progdefaults.RX_corr != 0) {
 		if (rxppm != progdefaults.RX_corr) {
 			rxppm = progdefaults.RX_corr;
@@ -1867,7 +1879,23 @@ size_t SoundPulse::Read(float *buf, size_t count)
 		if (pa_simple_read(sd[0].stream, buf, sizeof(float) * count, &err) == -1)
 			throw SndPulseException(err);
 	}
+#endif
+	if (count != 512) {
+	     std::cout  << "Want " << count << std::endl;
+	}
+	count = read(fd, buf, sizeof(float) * count);
+	count /= sizeof(float);
+			MilliSleep((long)ceil((1e3 * count) / sample_frequency));
+	
+	if (count != 512) {
+	     std::cout  << "Read in " << count << std::endl;
+	}
 
+	if (count < 0 && errno != EAGAIN) {
+	     perror("read");
+	     exit(89);
+	}
+	
 #if USE_SNDFILE
 	if (capture)
                 write_file(ofCapture, buf, count);
