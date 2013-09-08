@@ -1692,7 +1692,7 @@ void SoundPulse::Close(unsigned dir)
 {
 	if (dir == 1 || dir == UINT_MAX)
 		flush(1);
-	close(fd);
+
 	Abort(dir);
 }
 
