@@ -284,7 +284,8 @@ private:
         static long	src_read_cb(void* arg, float** data);
 	size_t	resample_write(float* buf, size_t count);
 	int fd;
- 
+	bool need_sleep;
+
 private:
 	struct stream_data {
 		pa_simple*	stream;

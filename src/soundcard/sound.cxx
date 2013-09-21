@@ -1633,7 +1633,7 @@ SoundPulse::SoundPulse(const char *dev)
 	memset(src_buffer, 0, sd[1].stream_params.channels * SND_BUF_LEN * sizeof(*src_buffer));
 	memset(fbuf, 0, MAX(sd[0].stream_params.channels, sd[1].stream_params.channels) * SND_BUF_LEN * sizeof(*fbuf));
 	fd = -1;
-
+	need_sleep = True;
 }
 
 SoundPulse::~SoundPulse()
@@ -1683,6 +1683,15 @@ int SoundPulse::Open(int mode, int freq)
 		  perror("open");
 		  exit(10);
 	     }
+             struct stat mystat;
+	     stat("/data/matt/mygnuradio/gnuradio_pipe_8k.raw", &mystat);
+	     if (S_ISFIFO(mystat.st_mode)) {
+		  need_sleep = False;
+		  std::cout << "We are reading from a pipe" << std::endl;
+	     } else {
+		  std::cout << "We are reading from a boring old file" << std::endl;
+	     }
+             
 	}
 
 	return 0;
@@ -1880,16 +1889,20 @@ size_t SoundPulse::Read(float *buf, size_t count)
 			throw SndPulseException(err);
 	}
 #endif
-	if (count != 512) {
-	     std::cout  << "Want " << count << std::endl;
-	}
+	//if (count != 512) {
+	//     std::cout  << "Want " << count << std::endl;
+	//}
 	count = read(fd, buf, sizeof(float) * count);
 	count /= sizeof(float);
-			MilliSleep((long)ceil((1e3 * count) / sample_frequency));
-	
-	if (count != 512) {
-	     std::cout  << "Read in " << count << std::endl;
+	if (need_sleep) {
+	     MilliSleep((long)ceil((1000 * count) / sample_frequency));
+	} else {
+	     //MilliSleep((long)ceil((950 * count) / sample_frequency));
 	}
+
+	//if (count != 512) {
+	//     std::cout  << "Read in " << count << std::endl;
+	//}
 
 	if (count < 0 && errno != EAGAIN) {
 	     perror("read");
