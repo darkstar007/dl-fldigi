@@ -968,7 +968,7 @@
         /* Sound card */                                                                \
         ELEM_(int, btnAudioIOis, "AUDIOIO",                                             \
               "Audio subsystem.  Values are as follows:\n"                              \
-              "  0: OSS; 1: PortAudio; 2: PulseAudio; 3: File I/O",                     \
+              "  0: OSS; 1: PortAudio; 2: PulseAudio; 3: File I/O; 4: FIFO I/O",        \
               SND_IDX_NULL)                                                             \
         ELEM_(std::string, OSSdevice, "OSSDEVICE",                                      \
               "OSS device name",                                                        \
@@ -992,6 +992,9 @@
         ELEM_(std::string, PulseServer, "PULSESERVER",                                  \
               "PulseAudio server string",                                               \
               "")                                                                       \
+        ELEM_(std::string, FileName, "FILENAME",                                        \
+              "File/Pipe/FIFO to read data from",                			\
+              "/dev/zero")                                                              \
         ELEM_(int, in_channels, "INCHANNELS",                                           \
               "Number of audio input channels",                                         \
               1)                                                                        \

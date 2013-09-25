@@ -522,6 +522,7 @@ void trx_start_modem(modem* m, int f)
 void trx_reset_loop()
 {
 	if (scard)  {
+
 		delete scard;
 		scard = 0;
 	}
@@ -542,6 +543,12 @@ void trx_reset_loop()
 		scard = new SoundPulse(scDevice[0].c_str());
 		break;
 #endif
+	case SND_IDX_FILE:
+	     std::cout << "trx_reset_loop " << scDevice[0].c_str() << std::endl;
+
+	     scard = new SoundFile(scDevice[0].c_str());
+	     break;
+
 	case SND_IDX_NULL:
 		scard = new SoundNull;
 		break;
@@ -590,6 +597,10 @@ void trx_start(void)
 		scard = new SoundPulse(scDevice[0].c_str());
 		break;
 #endif
+	case SND_IDX_FILE:
+	     scard = new SoundFile(scDevice[0].c_str());
+	     break;
+
 	case SND_IDX_NULL:
 		scard = new SoundNull;
 		break;

@@ -1632,8 +1632,6 @@ SoundPulse::SoundPulse(const char *dev)
 	memset(snd_buffer, 0, sd[0].stream_params.channels * SND_BUF_LEN * sizeof(*snd_buffer));
 	memset(src_buffer, 0, sd[1].stream_params.channels * SND_BUF_LEN * sizeof(*src_buffer));
 	memset(fbuf, 0, MAX(sd[0].stream_params.channels, sd[1].stream_params.channels) * SND_BUF_LEN * sizeof(*fbuf));
-	fd = -1;
-	need_sleep = True;
 }
 
 SoundPulse::~SoundPulse()
@@ -1657,7 +1655,6 @@ int SoundPulse::Open(int mode, int freq)
 			      progdefaults.PulseServer.c_str() : NULL);
 	char sname[32];
 	int err;
-	std::cout << "freq = " << freq << std::endl;
 
 	sample_frequency = freq;
 	for (int i = 0; i < 2; i++) {
@@ -1676,22 +1673,6 @@ int SoundPulse::Open(int mode, int freq)
 					     &sd[i].buffer_attrs, &err);
 		if (!sd[i].stream)
 			throw SndPulseException(err);
-	}
-	if (fd == -1) {
-	     fd = open("/data/matt/mygnuradio/gnuradio_pipe_8k.raw", O_RDONLY);
-	     if (fd < 0) {
-		  perror("open");
-		  exit(10);
-	     }
-             struct stat mystat;
-	     stat("/data/matt/mygnuradio/gnuradio_pipe_8k.raw", &mystat);
-	     if (S_ISFIFO(mystat.st_mode)) {
-		  need_sleep = False;
-		  std::cout << "We are reading from a pipe" << std::endl;
-	     } else {
-		  std::cout << "We are reading from a boring old file" << std::endl;
-	     }
-             
 	}
 
 	return 0;
@@ -1867,7 +1848,6 @@ size_t SoundPulse::Read(float *buf, size_t count)
 	}
 #endif
 
-#ifdef DONT_DO
 	if (progdefaults.RX_corr != 0) {
 		if (rxppm != progdefaults.RX_corr) {
 			rxppm = progdefaults.RX_corr;
@@ -1887,26 +1867,6 @@ size_t SoundPulse::Read(float *buf, size_t count)
 		int err;
 		if (pa_simple_read(sd[0].stream, buf, sizeof(float) * count, &err) == -1)
 			throw SndPulseException(err);
-	}
-#endif
-	//if (count != 512) {
-	//     std::cout  << "Want " << count << std::endl;
-	//}
-	count = read(fd, buf, sizeof(float) * count);
-	count /= sizeof(float);
-	if (need_sleep) {
-	     MilliSleep((long)ceil((1000 * count) / sample_frequency));
-	} else {
-	     //MilliSleep((long)ceil((950 * count) / sample_frequency));
-	}
-
-	//if (count != 512) {
-	//     std::cout  << "Read in " << count << std::endl;
-	//}
-
-	if (count < 0 && errno != EAGAIN) {
-	     perror("read");
-	     exit(89);
 	}
 	
 #if USE_SNDFILE
@@ -1940,6 +1900,98 @@ void SoundPulse::src_data_reset(int mode)
 }
 
 #endif // USE_PULSEAUDIO
+
+SoundFile::SoundFile(const char *dev)
+{
+     std::cout << "We got called with " << dev << std::endl;
+     fname = dev;
+     tx_src_data = new SRC_DATA;
+
+	snd_buffer = new float[SND_BUF_LEN];
+	src_buffer = new float[SND_BUF_LEN];
+	fbuf = new float[SND_BUF_LEN];
+
+	memset(snd_buffer, 0, SND_BUF_LEN * sizeof(*snd_buffer));
+	memset(src_buffer, 0, SND_BUF_LEN * sizeof(*src_buffer));
+	memset(fbuf, 0, SND_BUF_LEN * sizeof(*fbuf));
+
+	fd = -1;
+	need_sleep = True;
+}
+
+SoundFile::~SoundFile()
+{
+	Close();
+
+	delete [] snd_buffer;
+	delete [] src_buffer;
+	delete [] fbuf;
+}
+
+int SoundFile::Open(int mode, int freq)
+{
+        struct stat mystat;
+	std::cout << "freq = " << freq << std::endl;
+
+	sample_frequency = freq;
+
+	if (fd == -1) {
+	     fd = open(fname, O_RDONLY);    
+	     if (fd < 0) {
+		  perror("open");
+		  std::cout << "Opening /dev/zero to keep us out of trouble...." << std::endl;
+		  fd = open(fname, O_RDONLY);
+	     } else {
+	     
+		  stat(fname, &mystat);
+		  if (S_ISFIFO(mystat.st_mode)) {
+		       need_sleep = False;
+		       std::cout << "We are reading from a pipe" << std::endl;
+		  } else {
+		       std::cout << "We are reading from a boring old file" << std::endl;
+		  }
+             }
+	}
+
+	return 0;
+}
+
+void SoundFile::Close(unsigned dir)
+{
+     std::cout << "Closing file " << std::endl;
+     if (fd >= 0) {
+	  close(fd);
+     }
+     fd = -1;
+}
+
+void SoundFile::Abort(unsigned dir)
+{
+
+}
+
+void SoundFile::flush(unsigned dir)
+{
+
+}
+
+size_t SoundFile::Read(float *buf, size_t count)
+{
+     count = read(fd, buf, sizeof(float) * count);
+     count /= sizeof(float);
+     if (need_sleep) {
+	  MilliSleep((long)ceil((1000 * count) / sample_frequency));
+     } 
+     
+     
+     if (count < 0 && errno != EAGAIN) {
+	  perror("read");
+	  exit(89);
+     }
+     
+     return count;
+}
+
 
 
 size_t SoundNull::Write(double* buf, size_t count)

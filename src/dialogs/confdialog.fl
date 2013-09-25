@@ -1,5 +1,5 @@
 # data file for the Fltk User Interface Designer (fluid)
-version 1.0300 
+version 1.0302 
 i18n_type 1 
 i18n_include "gettext.h" 
 i18n_function _ 
@@ -155,15 +155,15 @@ static const char szProsigns[] = "~|%|&|+|=|{|}|<|>|[|]| ";} {}
   code {static const int payload_browser_columns[] = { 180, 350 };} {}
   Fl_Window {} {
     label {Fldigi configuration} open
-    xywh {593 55 540 400} type Double color 45 selection_color 51 labelsize 18 align 80 non_modal visible
+    xywh {1322 155 540 400} type Double color 45 selection_color 51 labelsize 18 align 80 non_modal visible
   } {
     Fl_Tabs tabsConfigure {open
-      xywh {-5 0 596 372} color 50 selection_color 50
+      xywh {-5 0 596 375} color 50 selection_color 50
     } {
       Fl_Group tabOperator {
         label Operator
-        callback {progdefaults.changed = true;} selected
-        tooltip {Operator information} xywh {0 25 540 345} when 1
+        callback {progdefaults.changed = true;}
+        tooltip {Operator information} xywh {0 25 540 345} when 1 hide
       } {
         Fl_Group {} {
           label Station open
@@ -3325,8 +3325,8 @@ progdefaults.changed = true;}
         }
       }
       Fl_Group tabSoundCard {
-        label Audio
-        tooltip {Audio devices} xywh {0 25 540 345} hide
+        label Audio open
+        tooltip {Audio devices} xywh {0 25 540 345}
       } {
         Fl_Tabs tabsSoundCard {open
           xywh {0 25 540 345} selection_color 50
@@ -3412,6 +3412,28 @@ http://www.pulseaudio.org/wiki/ServerStrings} xywh {275 201 225 25}
 progdefaults.changed = true;
 resetSoundCard();}
                 tooltip {NO AUDIO DEVICE AVAILABLE (or testing)} xywh {31 245 100 25} down_box DOWN_BOX selection_color 1
+              }
+            }
+            Fl_Group AudioFile {open
+              xywh {20 278 490 45} box ENGRAVED_FRAME
+            } {
+              Fl_Round_Button {btnAudioIO[4]} {
+                label File
+                callback {sound_update(SND_IDX_FILE);
+progdefaults.changed = true;
+resetSoundCard();}
+                tooltip {Use Files (8ks/s float) - and PIPE/FIFOs on UNIX)} xywh {30 289 100 25} down_box DOWN_BOX selection_color 1
+              }
+              Fl_Input inpFileName {
+                label {File/PIPE string:}
+                callback {scDevice[0] = scDevice[1] = progdefaults.FileName = o->value();
+resetSoundCard();
+progdefaults.changed = true;} selected
+                tooltip {Leave this blank or refer to
+http://www.pulseaudio.org/wiki/ServerStrings} xywh {275 289 225 25}
+                code0 {o->value(progdefaults.FileName.c_str());}
+                code1 {inpFileName->labelsize(FL_NORMAL_SIZE);}
+                class Fl_Input2
               }
             }
           }
@@ -4582,7 +4604,7 @@ progdefaults.changed = true;}
         } {
           Fl_Group tabDLEnable {
             label Enable open
-            xywh {0 50 540 320}
+            xywh {0 50 540 320} hide
           } {
             Fl_Group {} {
               label habitat open
@@ -4847,7 +4869,7 @@ btnApplyConfig->activate();}
           }
           Fl_Group tabDLFlights {
             label {Active flights list} open
-            xywh {0 50 540 323}
+            xywh {0 50 540 323} hide
           } {
             Fl_Browser flight_browser {
               callback {if (habFlight)
@@ -4889,7 +4911,7 @@ dl_fldigi::hbtint::uthr->payloads();}
           }
           Fl_Group tabDLPayloads {
             label {All payloads (testing)} open
-            xywh {0 50 540 323} hide
+            xywh {0 50 540 323}
           } {
             Fl_Browser payload_browser {
               callback {flight_browser->deselect();
@@ -4926,7 +4948,7 @@ dl_fldigi::hbtint::uthr->payloads();}
                 xywh {75 300 165 25} when 1
               }
               Fl_Choice payload_transmission_list {
-                label {Mode:} open selected
+                label {Mode:} open
                 xywh {75 330 230 25} down_box BORDER_BOX
               } {}
               Fl_Button {} {

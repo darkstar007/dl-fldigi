@@ -407,6 +407,7 @@ void sound_init(void)
 	AudioPulse->deactivate();
 	btnAudioIO[SND_IDX_PULSE]->deactivate();
 #endif
+	
 	if (progdefaults.btnAudioIOis == SND_IDX_UNKNOWN ||
 	    !btnAudioIO[progdefaults.btnAudioIOis]->active()) { // or saved sound api now disabled
 		int io[4] = { SND_IDX_PORT, SND_IDX_PULSE, SND_IDX_OSS, SND_IDX_NULL };
@@ -447,6 +448,7 @@ void sound_update(unsigned idx)
 	menuPortInDev->deactivate();
 	menuPortOutDev->deactivate();
 	inpPulseServer->deactivate();
+	inpFileName->deactivate();
 
 	// settings
 	menuInSampleRate->deactivate();
@@ -512,6 +514,11 @@ void sound_update(unsigned idx)
 		break;
 #endif
 
+	case SND_IDX_FILE:
+	     inpFileName->activate();
+	     scDevice[0] = scDevice[1] = inpFileName->value();
+	     break;
+	     
 	case SND_IDX_NULL:
 		scDevice[0] = scDevice[1] = "";
 		break;

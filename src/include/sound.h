@@ -283,8 +283,6 @@ private:
 	void	src_data_reset(int mode);
         static long	src_read_cb(void* arg, float** data);
 	size_t	resample_write(float* buf, size_t count);
-	int fd;
-	bool need_sleep;
 
 private:
 	struct stream_data {
@@ -314,6 +312,36 @@ protected:
 };
 
 #endif // USE_PULSEAUDIO
+
+class SoundFile : public SoundBase
+{
+public:
+	SoundFile(const char* fname);
+	virtual ~SoundFile();
+
+	int	Open(int mode, int freq = 8000);
+	void    Close(unsigned dir = UINT_MAX);
+	void    Abort(unsigned dir = UINT_MAX);
+	size_t	Write(double* buf, size_t count) {return 0;}
+	size_t	Write_stereo(double* bufleft, double* bufright, size_t count) { return 0;}
+	size_t	Read(float *buf, size_t count);
+	bool	must_close(int dir = 0) { return false; }
+	void	flush(unsigned dir = UINT_MAX);
+
+private:
+	void	src_data_reset(int mode);
+        static long	src_read_cb(void* arg, float** data);
+	size_t	resample_write(float* buf, size_t count);
+	int fd;
+	bool need_sleep;
+	const char * fname;
+
+private:
+	SRC_DATA* tx_src_data;
+	float* fbuf;
+	float* snd_buffer;
+	float* src_buffer;
+};
 
 
 class SoundNull : public SoundBase
