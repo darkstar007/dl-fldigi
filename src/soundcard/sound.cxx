@@ -1931,24 +1931,35 @@ SoundFile::~SoundFile()
 int SoundFile::Open(int mode, int freq)
 {
         struct stat mystat;
+	int stat_err;
 	std::cout << "freq = " << freq << std::endl;
 
 	sample_frequency = freq;
 
 	if (fd == -1) {
-	     fd = open(fname, O_RDONLY);    
-	     if (fd < 0) {
-		  perror("open");
-		  std::cout << "Opening /dev/zero to keep us out of trouble...." << std::endl;
-		  fd = open(fname, O_RDONLY);
-	     } else {
+	     stat_err = stat(fname, &mystat);
 	     
-		  stat(fname, &mystat);
-		  if (S_ISFIFO(mystat.st_mode)) {
-		       need_sleep = False;
-		       std::cout << "We are reading from a pipe" << std::endl;
+	     if (stat_err < 0) {
+		  perror("open");
+	     } else {
+		  if (S_ISDIR(mystat.st_mode)) {
+		       std::cout << "That directory tasted bad!" << std::endl;
 		  } else {
-		       std::cout << "We are reading from a boring old file" << std::endl;
+                       fd = open(fname, O_RDONLY);
+		       if (fd < 0) {
+			    perror("File permissions?:");
+		       } else {
+			    if (S_ISCHR(mystat.st_mode) || S_ISBLK(mystat.st_mode)) {
+				 std::cout << "Not convinced I should be reading from a block/char device - but I'll give it a go!" 
+				      << std::endl;
+			    }
+			    if (S_ISFIFO(mystat.st_mode)) {
+				 need_sleep = False;
+				 std::cout << "We are reading from a pipe" << std::endl;
+			    } else {
+				 std::cout << "We are reading from a boring old file" << std::endl;
+			    }
+		       }
 		  }
              }
 	}
@@ -1977,8 +1988,12 @@ void SoundFile::flush(unsigned dir)
 
 size_t SoundFile::Read(float *buf, size_t count)
 {
-     count = read(fd, buf, sizeof(float) * count);
-     count /= sizeof(float);
+     if (fd >= 0) {
+          count = read(fd, buf, sizeof(float) * count);
+	  count /= sizeof(float);
+     } else {
+	  count = 0;
+     }
      if (need_sleep) {
 	  MilliSleep((long)ceil((1000 * count) / sample_frequency));
      } 

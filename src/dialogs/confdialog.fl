@@ -155,7 +155,7 @@ static const char szProsigns[] = "~|%|&|+|=|{|}|<|>|[|]| ";} {}
   code {static const int payload_browser_columns[] = { 180, 350 };} {}
   Fl_Window {} {
     label {Fldigi configuration} open
-    xywh {1322 155 540 400} type Double color 45 selection_color 51 labelsize 18 align 80 non_modal visible
+    xywh {1322 155 540 400} type Double color 45 selection_color 51 labelsize 18 align 80 hide non_modal
   } {
     Fl_Tabs tabsConfigure {open
       xywh {-5 0 596 375} color 50 selection_color 50
@@ -3415,22 +3415,22 @@ resetSoundCard();}
               }
             }
             Fl_Group AudioFile {open
-              xywh {20 278 490 45} box ENGRAVED_FRAME
+              xywh {20 280 490 45} box ENGRAVED_FRAME
             } {
               Fl_Round_Button {btnAudioIO[4]} {
                 label File
                 callback {sound_update(SND_IDX_FILE);
 progdefaults.changed = true;
 resetSoundCard();}
-                tooltip {Use Files (8ks/s float) - and PIPE/FIFOs on UNIX)} xywh {30 289 100 25} down_box DOWN_BOX selection_color 1
+                tooltip {Use Files (8ks/s float) - and PIPE/FIFOs on UNIX)} xywh {30 291 100 25} down_box DOWN_BOX selection_color 1
               }
               Fl_Input inpFileName {
-                label {File/PIPE string:}
+                label {File/FIFO string:}
                 callback {scDevice[0] = scDevice[1] = progdefaults.FileName = o->value();
 resetSoundCard();
 progdefaults.changed = true;} selected
                 tooltip {Leave this blank or refer to
-http://www.pulseaudio.org/wiki/ServerStrings} xywh {275 289 225 25}
+http://www.pulseaudio.org/wiki/ServerStrings} xywh {275 291 225 25}
                 code0 {o->value(progdefaults.FileName.c_str());}
                 code1 {inpFileName->labelsize(FL_NORMAL_SIZE);}
                 class Fl_Input2

@@ -994,7 +994,7 @@
               "")                                                                       \
         ELEM_(std::string, FileName, "FILENAME",                                        \
               "File/Pipe/FIFO to read data from",                			\
-              "/dev/zero")                                                              \
+              "")                                                                       \
         ELEM_(int, in_channels, "INCHANNELS",                                           \
               "Number of audio input channels",                                         \
               1)                                                                        \

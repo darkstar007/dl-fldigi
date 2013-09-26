@@ -2732,7 +2732,6 @@ Fl_Input2 *inpFileName=(Fl_Input2 *)0;
 
 static void cb_inpFileName(Fl_Input2* o, void*) {
   scDevice[0] = scDevice[1] = progdefaults.FileName = o->value();
-  std::cout << "In callback " << o->value() << std::endl; 
 resetSoundCard();
 progdefaults.changed = true;
 }
