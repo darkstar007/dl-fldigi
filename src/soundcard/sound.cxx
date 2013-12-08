@@ -2056,9 +2056,9 @@ void SoundPulse::src_data_reset(int mode)
 
 SoundFile::SoundFile(const char *dev)
 {
-     std::cout << "We got called with " << dev << std::endl;
-     fname = dev;
-     tx_src_data = new SRC_DATA;
+        std::cout << "We got called with " << dev << std::endl;
+        fname = dev;
+        tx_src_data = new SRC_DATA;
 
 	snd_buffer = new float[SND_BUF_LEN];
 	src_buffer = new float[SND_BUF_LEN];
@@ -2098,7 +2098,7 @@ int SoundFile::Open(int mode, int freq)
 		  if (S_ISDIR(mystat.st_mode)) {
 		       std::cout << "That directory tasted bad!" << std::endl;
 		  } else {
-                       fd = open(fname, O_RDONLY);
+                       fd = open(fname, O_RDONLY | O_NONBLOCK);
 		       if (fd < 0) {
 			    perror("File permissions?:");
 		       } else {
@@ -2141,23 +2141,36 @@ void SoundFile::flush(unsigned dir)
 
 size_t SoundFile::Read(float *buf, size_t count)
 {
+     ssize_t read_count;
+
      if (fd >= 0) {
-          count = read(fd, buf, sizeof(float) * count);
-	  count /= sizeof(float);
+          read_count = read(fd, buf, sizeof(float) * count);
+	  if (read_count > 0) {
+	       read_count /= sizeof(float);
+	  }
      } else {
-	  count = 0;
+	  read_count = 0;
      }
      if (need_sleep) {
-	  MilliSleep((long)ceil((1000 * count) / sample_frequency));
-     } 
-     
-     
-     if (count < 0 && errno != EAGAIN) {
-	  perror("read");
-	  exit(89);
+	  MilliSleep((long)ceil((1000 * read_count) / sample_frequency));
+     }
+     if (read_count <= 0) {
+	  MilliSleep((long)ceil((200 * count) / sample_frequency));
+     }
+
+     //if (read_count > 0 || read_count < 0) {
+//	  std::cout << "We just read in " << read_count << " out of " << count << std::endl;
+     //    }
+     if (read_count < 0) {
+	  if (errno == EAGAIN || errno == EWOULDBLOCK) {
+	       read_count = 0;
+	  } else {
+	       perror("read");
+	       exit(89);
+	  }
      }
      
-     return count;
+     return read_count;
 }
 
 

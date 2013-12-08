@@ -235,7 +235,7 @@ void trx_trx_receive_loop()
 	while (1) {
 		try {
 			numread = 0;
-			while (numread < SCBLOCKSIZE && trx_state == STATE_RX)
+			while (numread < SCBLOCKSIZE && trx_state == STATE_RX) 
 				numread += scard->Read(fbuf + numread, SCBLOCKSIZE - numread);
 			if (bHighSpeed) {
 				for (size_t i = 0; i < numread; i++)
