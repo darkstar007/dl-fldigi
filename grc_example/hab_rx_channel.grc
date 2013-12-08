@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='ASCII'?>
 <flow_graph>
-  <timestamp>Sun Oct  6 20:24:20 2013</timestamp>
+  <timestamp>Sun Oct 20 14:33:52 2013</timestamp>
   <block>
     <key>options</key>
     <param>
@@ -64,7 +64,7 @@
     <key>variable</key>
     <param>
       <key>id</key>
-      <value>agc_decay</value>
+      <value>fname</value>
     </param>
     <param>
       <key>_enabled</key>
@@ -72,103 +72,11 @@
     </param>
     <param>
       <key>value</key>
-      <value>50e-6</value>
+      <value>str(base_fname)+'/'+str(channel_number)</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(21, 525)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>id</key>
-      <value>high_ssb</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>2800</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(15, 389)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>id</key>
-      <value>low_ssb</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>200</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(15, 323)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>id</key>
-      <value>decim</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>4</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(34, 251)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>variable</key>
-    <param>
-      <key>id</key>
-      <value>samp_rate</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>256000</value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(10, 170)</value>
+      <value>(11, 591)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -202,19 +110,19 @@
     <key>variable</key>
     <param>
       <key>id</key>
-      <value>variable_1</value>
+      <value>samp_rate</value>
     </param>
     <param>
       <key>_enabled</key>
-      <value>False</value>
+      <value>True</value>
     </param>
     <param>
       <key>value</key>
-      <value>0</value>
+      <value>256000</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(523, 580)</value>
+      <value>(10, 170)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -225,7 +133,7 @@
     <key>variable</key>
     <param>
       <key>id</key>
-      <value>fname</value>
+      <value>decim</value>
     </param>
     <param>
       <key>_enabled</key>
@@ -233,11 +141,11 @@
     </param>
     <param>
       <key>value</key>
-      <value>"/data/matt/mygnuradio/pipes/"+str(channel_number)</value>
+      <value>4</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(11, 591)</value>
+      <value>(34, 251)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -245,50 +153,72 @@
     </param>
   </block>
   <block>
-    <key>rational_resampler_xxx</key>
+    <key>variable</key>
     <param>
       <key>id</key>
-      <value>rational_resampler_xxx_0</value>
+      <value>low_ssb</value>
     </param>
     <param>
       <key>_enabled</key>
       <value>True</value>
     </param>
     <param>
-      <key>type</key>
-      <value>fff</value>
-    </param>
-    <param>
-      <key>interp</key>
-      <value>441</value>
-    </param>
-    <param>
-      <key>decim</key>
-      <value>640</value>
-    </param>
-    <param>
-      <key>taps</key>
-      <value></value>
-    </param>
-    <param>
-      <key>fbw</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>affinity</key>
-      <value></value>
-    </param>
-    <param>
-      <key>minoutbuf</key>
-      <value>0</value>
+      <key>value</key>
+      <value>200</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(1166, 250)</value>
+      <value>(15, 323)</value>
     </param>
     <param>
       <key>_rotation</key>
-      <value>270</value>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>id</key>
+      <value>high_ssb</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>2800</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(15, 389)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>variable</key>
+    <param>
+      <key>id</key>
+      <value>agc_decay</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>50e-6</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(21, 525)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
     </param>
   </block>
   <block>
@@ -538,115 +468,6 @@
     </param>
   </block>
   <block>
-    <key>audio_sink</key>
-    <param>
-      <key>id</key>
-      <value>audio_sink_0</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>samp_rate</key>
-      <value>44100</value>
-    </param>
-    <param>
-      <key>device_name</key>
-      <value>pulse</value>
-    </param>
-    <param>
-      <key>ok_to_block</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>num_inputs</key>
-      <value>1</value>
-    </param>
-    <param>
-      <key>affinity</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(1183, 672)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>270</value>
-    </param>
-  </block>
-  <block>
-    <key>parameter</key>
-    <param>
-      <key>id</key>
-      <value>channel_number</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>label</key>
-      <value></value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>0</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>intx</value>
-    </param>
-    <param>
-      <key>short_id</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(571, 10)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
-    <key>parameter</key>
-    <param>
-      <key>id</key>
-      <value>af_gain</value>
-    </param>
-    <param>
-      <key>_enabled</key>
-      <value>True</value>
-    </param>
-    <param>
-      <key>label</key>
-      <value></value>
-    </param>
-    <param>
-      <key>value</key>
-      <value>0.05</value>
-    </param>
-    <param>
-      <key>type</key>
-      <value>eng_float</value>
-    </param>
-    <param>
-      <key>short_id</key>
-      <value></value>
-    </param>
-    <param>
-      <key>_coordinate</key>
-      <value>(717, 20)</value>
-    </param>
-    <param>
-      <key>_rotation</key>
-      <value>0</value>
-    </param>
-  </block>
-  <block>
     <key>band_pass_filter</key>
     <param>
       <key>id</key>
@@ -750,6 +571,197 @@
     <param>
       <key>_rotation</key>
       <value>270</value>
+    </param>
+  </block>
+  <block>
+    <key>audio_sink</key>
+    <param>
+      <key>id</key>
+      <value>audio_sink_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>samp_rate</key>
+      <value>24000</value>
+    </param>
+    <param>
+      <key>device_name</key>
+      <value>pulse</value>
+    </param>
+    <param>
+      <key>ok_to_block</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>num_inputs</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(1183, 672)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>270</value>
+    </param>
+  </block>
+  <block>
+    <key>rational_resampler_xxx</key>
+    <param>
+      <key>id</key>
+      <value>rational_resampler_xxx_0</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>fff</value>
+    </param>
+    <param>
+      <key>interp</key>
+      <value>24</value>
+    </param>
+    <param>
+      <key>decim</key>
+      <value>64</value>
+    </param>
+    <param>
+      <key>taps</key>
+      <value></value>
+    </param>
+    <param>
+      <key>fbw</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>minoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(1166, 250)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>270</value>
+    </param>
+  </block>
+  <block>
+    <key>parameter</key>
+    <param>
+      <key>id</key>
+      <value>af_gain</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>label</key>
+      <value>AF Gain</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>0.05</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>eng_float</value>
+    </param>
+    <param>
+      <key>short_id</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(232, 257)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>parameter</key>
+    <param>
+      <key>id</key>
+      <value>channel_number</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>label</key>
+      <value>Channel Number</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>intx</value>
+    </param>
+    <param>
+      <key>short_id</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(222, 355)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
+    </param>
+  </block>
+  <block>
+    <key>parameter</key>
+    <param>
+      <key>id</key>
+      <value>base_fname</value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>True</value>
+    </param>
+    <param>
+      <key>label</key>
+      <value>Base Filename</value>
+    </param>
+    <param>
+      <key>value</key>
+      <value>"/data/matt/mygnuradio/pipes"</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>string</value>
+    </param>
+    <param>
+      <key>short_id</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(251, 469)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>0</value>
     </param>
   </block>
   <connection>

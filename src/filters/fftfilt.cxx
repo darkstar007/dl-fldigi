@@ -28,251 +28,273 @@
 // ----------------------------------------------------------------------------
 
 #include <config.h>
+
 #include <memory.h>
+#include <iostream>
+#include <fstream>
+#include <cstdlib>
+#include <cmath>
+#include <typeinfo>
 
 #include <stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <memory.h>
 
-#include <cmath>
 #include "misc.h"
-
 #include "fftfilt.h"
 
+//------------------------------------------------------------------------------
+// initialize the filter
+// create forward and reverse FFTs
+//------------------------------------------------------------------------------
 
-fftfilt::fftfilt(double f1, double f2, int len)
+// probably only need a single instance of g_fft !!
+// use for both forward and reverse
+
+void fftfilt::init_filter()
 {
-	filterlen = len;
-	fft = new Cfft(filterlen);
-	ift = new Cfft(filterlen);
+	flen2 = flen >> 1;
+	fft			= new g_fft<double>(flen);
 
-	ovlbuf		= new complex[filterlen/2];
-	filter		= new complex[filterlen];
-	filtdata	= new complex[filterlen];
+	filter		= new cmplx[flen];
+	timedata	= new cmplx[flen];
+	freqdata	= new cmplx[flen];
+	output		= new cmplx[flen];
+	ovlbuf		= new cmplx[flen2];
+	ht			= new cmplx[flen];
 
-	for (int i = 0; i < filterlen; i++)
-		filter[i].re = filter[i].im =
-		filtdata[i].re = filtdata[i].im = 0.0;
-	for (int i = 0; i < filterlen/2; i++)
-		ovlbuf[i].re = ovlbuf[i].im = 0.0;
+	memset(filter, 0, flen * sizeof(cmplx));
+	memset(timedata, 0, flen * sizeof(cmplx));
+	memset(freqdata, 0, flen * sizeof(cmplx));
+	memset(output, 0, flen * sizeof(cmplx));
+	memset(ovlbuf, 0, flen2 * sizeof(cmplx));
+	memset(ht, 0, flen * sizeof(cmplx));
 
 	inptr = 0;
+}
 
+//------------------------------------------------------------------------------
+// fft filter
+// f1 < f2 ==> band pass filter
+// f1 > f2 ==> band reject filter
+// f1 == 0 ==> low pass filter
+// f2 == 0 ==> high pass filter
+//------------------------------------------------------------------------------
+fftfilt::fftfilt(double f1, double f2, int len)
+{
+	flen	= len;
+	init_filter();
 	create_filter(f1, f2);
 }
 
+//------------------------------------------------------------------------------
+// low pass filter
+//------------------------------------------------------------------------------
 fftfilt::fftfilt(double f, int len)
 {
-	filterlen = len;
-	fft = new Cfft(filterlen);
-	ift = new Cfft(filterlen);
-
-	ovlbuf		= new complex[filterlen/2];
-	filter		= new complex[filterlen];
-	filtdata	= new complex[filterlen];
-
-	for (int i = 0; i < filterlen; i++)
-		filter[i].re = filter[i].im =
-		filtdata[i].re = filtdata[i].im = 0.0;
-	for (int i = 0; i < filterlen/2; i++)
-		ovlbuf[i].re = ovlbuf[i].im = 0.0;
-
-	inptr = 0;
-
+	flen	= len;
+	init_filter();
 	create_lpf(f);
 }
 
 fftfilt::~fftfilt()
 {
 	if (fft) delete fft;
-	if (ift) delete ift;
-	if (ovlbuf) delete [] ovlbuf;
-	if (filter) delete [] filter;
-	if (filtdata) delete [] filtdata;
-}
 
+	if (filter) delete [] filter;
+	if (timedata) delete [] timedata;
+	if (freqdata) delete [] freqdata;
+	if (output) delete [] output;
+	if (ovlbuf) delete [] ovlbuf;
+	if (ht) delete [] ht;
+}
 
 void fftfilt::create_filter(double f1, double f2)
 {
-	int len = filterlen / 2 + 1;
-	double t, h, x, it;
-	Cfft *tmpfft;
-	tmpfft = new Cfft(filterlen);
-
 // initialize the filter to zero
-	for (int i = 0; i < filterlen; i++)
-		filter[i].re   = filter[i].im   = 0.0;
+	memset(ht, 0, flen * sizeof(cmplx));
 
 // create the filter shape coefficients by fft
-// filter values initialized to the impulse response h(t)
-	for (int i = 0; i < len; i++) {
-		it = (double) i;
-		t = it - (len - 1) / 2.0;
-		h = it / (len - 1);
+// filter values initialized to the ht response h(t)
+	bool b_lowpass, b_highpass;//, window;
+	b_lowpass = (f2 != 0);
+	b_highpass = (f1 != 0);
 
-		x = f2 * sinc(2 * f2 * t) - f1 * sinc(2 * f1 * t); // sinc(x)
-//		x *= hamming(t);
-//		x *= hanning(h);
-		x *= blackman(h);	// windowed by Blackman function
-		x *= filterlen;		// scaled for unity in passband
-		filter[i].re = x;
+	for (int i = 0; i < flen2; i++) {
+		ht[i] = 0;
+//combine lowpass / highpass
+// lowpass @ f2
+		if (b_lowpass) ht[i] += fsinc(f2, i, flen2);
+// highighpass @ f1
+		if (b_highpass) ht[i] -= fsinc(f1, i, flen2);
 	}
-// perform the complex forward fft to obtain H(w)
-	tmpfft->cdft(filter);
-// start outputs after 2 full passes are complete
-	pass = 2;
-	delete tmpfft;
-}
+// highpass is delta[flen2/2] - h(t)
+	if (b_highpass && f2 < f1) ht[flen2 / 2] += 1;
 
+	for (int i = 0; i < flen2; i++)
+		ht[i] *= _blackman(i, flen2);
 
-void fftfilt::create_lpf(double f)
-{
-	int len = filterlen / 2 + 1;
-	double t, h, x, it;
-	Cfft *tmpfft;
-	tmpfft = new Cfft(filterlen);
+// this may change since green fft is in place fft
+	memcpy(filter, ht, flen * sizeof(cmplx));
 
-// initialize the filter to zero
-	for (int i = 0; i < filterlen; i++)
-		filter[i].re   = filter[i].im   = 0.0;
+// ht is flen complex points with imaginary all zero
+// first half describes h(t), second half all zeros
+// perform the cmplx forward fft to obtain H(w)
+// filter is flen/2 complex values
 
-// create the filter shape coefficients by fft
-// filter values initialized to the impulse response h(t)
-	for (int i = 0; i < len; i++) {
-		it = (double) i;
-		t = it - (len - 1) / 2.0;
-		h = it / (len - 1);
+	fft->ComplexFFT(filter);
+//	fft->transform(ht, filter);
 
-		x = f * sinc(2 * f * t);
-		x *= blackman(h);	// windowed by Blackman function
-		x *= filterlen;		// scaled for unity in passband
-		filter[i].re = x;
+// normalize the output filter for unity gain
+	double scale = 0, mag;
+	for (int i = 0; i < flen2; i++) {
+		mag = abs(filter[i]);
+		if (mag > scale) scale = mag;
 	}
-// perform the complex forward fft to obtain H(w)
-	tmpfft->cdft(filter);
-// start outputs after 2 full passes are complete
-	pass = 2;
-	delete tmpfft;
-}
-
-//bool print_filter = true; // flag to inhibit printing multiple copies
-
-void fftfilt::create_rttyfilt(double f)
-{
-	int len = filterlen / 2 + 1;
-	double t, h, it;
-	Cfft *tmpfft;
-	tmpfft = new Cfft(filterlen);
-
-	// initialize the filter to zero
-	for (int i = 0; i < filterlen; i++)
-		filter[i].re   = filter[i].im   = 0.0;
-
-	// get an array to hold the sinc-respose
-	double* sinc_array = new double[ len ];
-
-	// create the impulse-response in it
-	for (int i = 0; i < len; ++i) {
-		it = (double)i;
-		t  = it - ( (double)len - 1.0) / 2.0;
-		h  = it / ( (double)len - 1.0);
-
-		// create the filter impulses with an additional zero at 1.5f
-		// remark: sinc(..) is scaled by 2, see misc.h
-
-// Modified Lanzcos filter see http://en.wikipedia.org/wiki/Lanczos_resampling
-		sinc_array[i] = 
-			( sinc( 3.0 * f * t             ) +
-			  sinc( 3.0 * f * t - 1.0       ) * 0.8 +
-			  sinc( 3.0 * f * t + 1.0       ) * 0.8 ) *
-			( sinc( 4.0 * f * t / 3.0       ) +
-			  sinc( 4.0 * f * t / 3.0 - 1.0 ) * 0.8 +
-			  sinc( 4.0 * f * t / 3.0 + 1.0 ) * 0.8 );
+	if (scale != 0) {
+		for (int i = 0; i < flen; i++)
+			filter[i] /= scale;
 	}
 
-	// normalize the impulse-responses
-	double sum = 0.0;
-	for (int i = 0; i < len; ++i) {
-		sum += sinc_array[i];
-		}
-	for (int i = 0; i < len; ++i) {
-		sinc_array[i] /= 8*sum;
-		}
-
-	// setup windowed-filter
-	for (int i = 0; i < len; ++i) {
-		it = (double)i;
-		t  = it - ( (double)len - 1.0) / 2.0;
-		h  = it / ( (double)len - 1.0);
-
-		filter[i].re = ( sinc_array[i] ) * (double)filterlen * blackman(h);
-		sinc_array[i] = filter[i].re;
-		}
-
-// perform the complex forward fft to obtain H(w)
-	tmpfft->cdft(filter);
+// perform the reverse fft to obtain h(t)
+// for testing
+// uncomment to obtain filter characteristics
 /*
-	if (print_filter) {
-		printf("Modified Lanzcos 1.5 stop bit filter\n\n");
-		printf("h(t), |H(w)|, dB\n\n");
-		double dc = 20*log10(filter[0].mag());
-		for (int i = 0; i < len; i++)
-			printf("%f, %f, %f\n", 
-				sinc_array[i], 
-				filter[i].mag(),
-				20*log10(filter[i].mag()) - dc);
-		print_filter = false;
-	}
-*/
-// start outputs after 2 full passes are complete
-	pass = 2;
-	delete tmpfft;
-	delete [] sinc_array;
+	cmplx *revht = new cmplx[flen];
+	memcpy(revht, filter, flen * sizeof(cmplx));
 
+	fft->InverseComplexFFT(revht);
+
+	std::fstream fspec;
+	fspec.open("fspec.csv", std::ios::out);
+	fspec << "i,imp.re,imp.im,filt.re,filt.im,filt.abs,revimp.re,revimp.im\n";
+	for (int i = 0; i < flen2; i++)
+		fspec
+			<< i << "," << ht[i].real() << "," << ht[i].imag() << ","
+			<< filter[i].real() << "," << filter[i].imag() << ","
+			<< abs(filter[i]) << ","
+			<< revht[i].real() << "," << revht[i].imag() << ","
+			<< std::endl;
+	fspec.close();
+	delete [] revht;
+*/
+	pass = 2;
 }
 
 /*
  * Filter with fast convolution (overlap-add algorithm).
  */
-int fftfilt::run(const complex& in, complex **out)
-{
-// collect filterlen/2 input samples
-	const int filterlen_div2 = filterlen / 2 ;
-	filtdata[inptr++] = in;
 
-	if (inptr < filterlen_div2)
+int fftfilt::run(const cmplx & in, cmplx **out)
+{
+// collect flen/2 input samples
+	timedata[inptr++] = in;
+
+	if (inptr < flen2)
 		return 0;
 	if (pass) --pass; // filter output is not stable until 2 passes
 
-// zero the rest of the input data
-	for (int i = filterlen_div2 ; i < filterlen; i++)
-		filtdata[i].re = filtdata[i].im = 0.0;
-
 // FFT transpose to the frequency domain
-	fft->cdft(filtdata);
+	memcpy(freqdata, timedata, flen * sizeof(cmplx));
+	fft->ComplexFFT(freqdata);
 
 // multiply with the filter shape
-	for (int i = 0; i < filterlen; i++)
-//		filtdata[i] = filtdata[i] * filter[i];
-		filtdata[i] *= filter[i];
+	for (int i = 0; i < flen; i++)
+		freqdata[i] *= filter[i];
 
-// IFFT transpose back to the time domain
-	ift->icdft(filtdata);
+// transform back to time domain
+	fft->InverseComplexFFT(freqdata);
 
 // overlap and add
-	for (int i = 0; i < filterlen_div2; i++) {
-		filtdata[i] += ovlbuf[i];
+// save the second half for overlapping next inverse FFT
+	for (int i = 0; i < flen2; i++) {
+		output[i] = ovlbuf[i] + freqdata[i];
+		ovlbuf[i] = freqdata[i+flen2];
 	}
-	*out = filtdata;
-
-// save the second half for overlapping
-	// Memcpy is allowed because complex are POD objects.
-	memcpy( ovlbuf, filtdata + filterlen_div2, sizeof( ovlbuf[0] ) * filterlen_div2 );
-
 
 // clear inbuf pointer
 	inptr = 0;
 
-// signal the caller there is filterlen/2 samples ready
+// signal the caller there is flen/2 samples ready
 	if (pass) return 0;
 
-	return filterlen_div2;
+	*out = output;
+	return flen2;
 }
+
+//------------------------------------------------------------------------------
+// rtty filter
+//------------------------------------------------------------------------------
+
+//bool print_filter = true; // flag to inhibit printing multiple copies
+
+void fftfilt::rtty_filter(double f)
+{
+// Raised cosine filter designed iaw Section 1.2.6 of
+// Telecommunications Measurements, Analysis, and Instrumentation
+// by Dr. Kamilo Feher / Engineers of Hewlett-Packard
+//
+// Frequency scaling factor determined hueristically by testing various values 
+// and measuring resulting decoder CER with input s/n = - 9 dB
+//
+//    K     CER
+//   1.0   .0244
+//   1.1   .0117
+//   1.2   .0081
+//   1.3   .0062
+//   1.4   .0054
+//   1.5   .0062
+//   1.6   .0076
+
+	f *= 1.4;
+
+	double dht;
+	for( int i = 0; i < flen2; ++i ) {
+		double x = (double)i/(double)(flen2);	
+
+// raised cosine response (changed for -1.0...+1.0 times Nyquist-f
+// instead of books versions ranging from -1..+1 times samplerate)
+
+		dht =
+			x <= 0 ? 1.0 :
+			x > 2.0 * f ? 0.0 :
+			cos((M_PI * x) / (f * 4.0));
+
+		dht *= dht; // cos^2
+
+// amplitude equalized nyquist-channel response
+		dht /= sinc(2.0 * i * f);
+
+		filter[i].real() = dht*cos((double)i* - 0.5*M_PI);
+		filter[i].imag() = dht*sin((double)i* - 0.5*M_PI);
+
+		filter[(flen-i)%flen].real() = dht*cos((double)i*+0.5*M_PI);
+		filter[(flen-i)%flen].imag() = dht*sin((double)i*+0.5*M_PI);
+	}
+
+// perform the reverse fft to obtain h(t)
+// for testing
+// uncomment to obtain filter characteristics
+/*
+	cmplx *revht = new cmplx[flen];
+	memcpy(revht, filter, flen * sizeof(cmplx));
+
+	fft->InverseComplexFFT(revht);
+
+	std::fstream fspec;
+	fspec.open("rtty_filter.csv", std::ios::out);
+	fspec << "i,filt.re,filt.im,filt.abs,,revimp.re,revimp.im\n";
+	for (int i = 0; i < flen; i++)
+		fspec
+			<< i << ","
+			<< filter[i].real() << "," << filter[i].imag() << "," << abs(filter[i]) 
+			<< ",," << revht[i].real() << "," << revht[i].imag()
+			<< std::endl;
+	fspec.close();
+	delete [] revht;
+*/
+// start outputs after 2 full passes are complete
+	pass = 2;
+}
+

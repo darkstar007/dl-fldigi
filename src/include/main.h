@@ -25,7 +25,9 @@ extern std::string		MacrosDir;
 extern std::string		WrapDir;
 extern std::string		TalkDir;
 extern std::string		TempDir;
+extern std::string		KmlDir;
 extern std::string		PskMailDir;
+extern std::string		DATA_dir;
 extern std::string		NBEMS_dir;
 extern std::string		ARQ_dir;
 extern std::string		ARQ_files_dir;
@@ -78,24 +80,19 @@ extern void			arq_close();
 extern void			WriteARQ(unsigned char);
 extern void			checkTLF();
 
-#define ARQBUFSIZ 8192
-
-struct RXMSGSTRUC {
-	long int msg_type;
-	char c;
-};
-
-struct TXMSGSTRUC {
-	long int msg_type;
-	char buffer[ARQBUFSIZ];
-};
-
-extern RXMSGSTRUC rxmsgst;
-extern int rxmsgid;
-extern TXMSGSTRUC txmsgst;
-extern int txmsgid;
-
 void check_nbems_dirs(void);
+void check_data_dir(void);
 extern bool nbems_dirs_checked;
+
+// This inits or reinits everything related to KML: Reloads params etc...
+void kml_init(bool load_files = false);
+
+// close down remaining threads just before exiting UI
+extern void exit_process();
+
+int directory_is_created( const char * strdir );
+
+// autostart an external program
+extern void start_process(std::string executable);
 
 #endif

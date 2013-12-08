@@ -33,6 +33,7 @@
 #include "misc.h"
 
 #include "fl_digi.h"
+#include "timeops.h"
 #include "configuration.h"
 #include "confdialog.h"
 #include "logger.h"
@@ -78,7 +79,6 @@ void pushcmd(CMDS cmd)
 	LOG_INFO("%s, # = %d", cmd.cmd.c_str(), (int)cmds.size());
 	cmds.push(cmd);
 }
-//#define pushcmd(a) cmds.push((a))
 
 // these variables are referenced outside of this file
 MACROTEXT macros;
@@ -522,6 +522,28 @@ static void pTUNE(std::string &s, size_t &i, size_t endbracket)
 	s.replace(i, endbracket - i + 1, "");
 }
 
+static void pQSONBR(std::string &s, size_t &i, size_t endbracket)
+{
+	if (within_exec) {
+		s.replace(i, endbracket - i + 1, "");
+		return;
+	}
+	char szqsonbr[10];
+	snprintf(szqsonbr, sizeof(szqsonbr), "%d", qsodb.nbrRecs());
+	s.replace(i, endbracket - i + 1, szqsonbr);
+}
+
+static void pNXTNBR(std::string &s, size_t &i, size_t endbracket)
+{
+	if (within_exec) {
+		s.replace(i, endbracket - i + 1, "");
+		return;
+	}
+	char szqsonbr[10];
+	snprintf(szqsonbr, sizeof(szqsonbr), "%d", qsodb.nbrRecs() + 1);
+	s.replace(i, endbracket - i + 1, szqsonbr);
+}
+
 static void pNRSID(std::string &s, size_t &i, size_t endbracket)
 {
 	if (within_exec) {
@@ -632,6 +654,11 @@ static void pGET(std::string &s, size_t &i, size_t endbracket)
 static void pFREQ(std::string &s, size_t &i, size_t endbracket)
 {
 	s.replace( i, 6, inpFreq->value() );
+}
+
+static void pBAND(std::string &s, size_t &i, size_t endbracket)
+{
+	s.replace( i, 6, band_name( band( wf->rfcarrier() ) ) );
 }
 
 static void pLOC(std::string &s, size_t &i, size_t endbracket)
@@ -867,6 +894,75 @@ static void pTXRX(std::string &s, size_t &i, size_t endbracket)
 	ToggleTXRX = true;
 }
 
+static std::string hexstr(std::string &s)
+{
+	static std::string hex;
+	static char val[3];
+	hex.clear();
+	for (size_t i = 0; i < s.length(); i++) {
+		snprintf(val, sizeof(val), "%02x", s[i] & 0xFF);
+		hex.append("<").append(val).append(">");
+	}
+	return hex;
+}
+
+static void pRIGCAT(std::string &s, size_t &i, size_t endbracket)
+{
+	if (within_exec) {
+		s.replace(i, endbracket - i + 1, "");
+		return;
+	}
+
+	LOG_INFO("cat cmd:retnbr %s", s.c_str());
+
+	size_t start = s.find(':', i);
+	std::basic_string<char> buff;
+
+	size_t val = 0;
+	int retnbr = 0;
+	char c, ch;
+	bool asciisw = false;
+	bool valsw = false;
+
+	for (size_t j = start+1 ; j <= endbracket ; j++) {
+		ch = s[j];
+		if (ch == '\"') {
+			asciisw = !asciisw;
+			continue;
+		}
+// accumulate ascii string
+		if (asciisw) {
+			if (isprint(ch)) buff += ch;
+			continue;
+		}
+// following digits is expected size of CAT response from xcvr
+		if (ch == ':' && s[j+1] != '>') {
+			sscanf(&s[j+1], "%d", &retnbr);
+		}
+// accumulate hex string values
+		if ((ch == ' ' || ch == '>' || ch == ':') && valsw) {
+			c = char(val);
+//			LOG_INFO("c=%02x, val=%d", c, val);
+			buff += c;
+			val = 0;
+			valsw = false;
+		} else {
+			val *= 16;
+			ch = toupper(ch);
+			if (isdigit(ch)) val += ch - '0';
+			else if (ch >= 'A' && ch <= 'F') val += ch - 'A' + 10;
+			valsw = true;
+		}
+		if (ch == ':') break;
+	}
+
+	LOG_INFO("cat %s", hexstr(buff).c_str());
+
+	sendCommand(buff, retnbr);
+
+	s.replace(i, endbracket - i + 1, "");
+}
+
 
 static void pVER(std::string &s, size_t &i, size_t endbracket)
 {
@@ -898,10 +994,8 @@ static void pDECR(std::string &s, size_t &i, size_t endbracket)
 		s.replace(i, endbracket - i + 1, "");
 		return;
 	}
-	int  contestval;
 	contest_count.count--;
 	if (contest_count.count < 0) contest_count.count = 0;
-	contestval = contest_count.count;
 	s.replace (i, 6, "");
 	updateOutSerNo();
 }
@@ -912,9 +1006,7 @@ static void pINCR(std::string &s, size_t &i, size_t endbracket)
 		s.replace(i, endbracket - i + 1, "");
 		return;
 	}
-	int  contestval;
 	contest_count.count++;
-	contestval = contest_count.count;
 	s.replace (i, 6, "");
 	updateOutSerNo();
 }
@@ -1029,6 +1121,35 @@ static void pMODEM_compSKED(std::string &s, size_t &i, size_t endbracket)
 	s.erase(i, k-i);
 }
 
+static void doIMAGE(std::string s)
+{
+	if (s.length() > 0) {
+		string fname = s.substr(7);
+		fname.erase(fname.length() - 1);
+		trx_mode active_mode = active_modem->get_mode();
+		if ((active_mode == MODE_MFSK16 ||
+			 active_mode == MODE_MFSK32 ||
+			 active_mode == MODE_MFSK64 ||
+			 active_mode == MODE_MFSK128) &&
+			 active_modem->get_cap() & modem::CAP_IMG) {
+			active_modem->send_image(fname);
+		}
+	}
+	que_ok = true;
+}
+
+static void pQueIMAGE(std::string &s, size_t &i, size_t endbracket)
+{
+	if (within_exec) {
+		s.replace(i, endbracket - i + 1, "");
+		return;
+	}
+	string cmdstr = s.substr(i, endbracket - i + 1);
+	struct CMDS cmd = { cmdstr, doIMAGE };
+	pushcmd(cmd);
+	s.replace(i, endbracket - i + 1, "^!");
+}
+
 #include <float.h>
 #include "re.h"
 
@@ -1079,8 +1200,6 @@ static void doMODEM(std::string s)
 				set_rtty_baud((float)args[1]);
 			if (args.at(2) != DBL_MIN)
 				set_rtty_bits((int)args[2]);
-			if (args.at(3) != DBL_MIN)
-				set_rtty_bw((float)args[3]);
 			break;
 		case MODE_CONTESTIA: // bandwidth, tones
 			if (args.at(0) != DBL_MIN)
@@ -1124,9 +1243,19 @@ static void pQueMODEM(std::string &s, size_t &i, size_t endbracket)
 		s.replace(i, endbracket - i + 1, "");
 		return;
 	}
-	struct CMDS cmd = { s.substr(i, endbracket - i + 1), doMODEM };
-	pushcmd(cmd);
-	s.replace(i, endbracket - i + 1, "^!");
+	string cmdstr = s.substr(i, endbracket - i + 1);
+	struct CMDS cmd = { cmdstr, doMODEM };
+	if (cmdstr.find("SSB") != string::npos || cmdstr.find("ANALYSIS") != string::npos) {
+		LOG_ERROR("Disallowed: %s", cmdstr.c_str());
+		size_t nextbracket = s.find('<', endbracket);
+		if (nextbracket != string::npos)
+			s.erase(i, nextbracket - i - 1);
+		else
+			s.clear(); 
+	} else {
+		pushcmd(cmd);
+		s.replace(i, endbracket - i + 1, "^!");
+	}
 }
 
 static void pMODEM(std::string &s, size_t &i, size_t endbracket)
@@ -1183,8 +1312,6 @@ static void pMODEM(std::string &s, size_t &i, size_t endbracket)
 				set_rtty_baud((float)args[1]);
 			if (args.at(2) != DBL_MIN)
 				set_rtty_bits((int)args[2]);
-			if (args.at(3) != DBL_MIN)
-				set_rtty_bw((float)args[3]);
 			break;
 		case MODE_CONTESTIA: // bandwidth, tones
 			if (args.at(0) != DBL_MIN)
@@ -1268,6 +1395,27 @@ static void pREV(std::string &s, size_t &i, size_t endbracket)
   }
   s.replace(i, endbracket - i + 1, "");
 }
+
+// <HS:on|off|t>
+static void pHS(std::string &s, size_t &i, size_t endbracket)
+{
+	if (within_exec) {
+		s.replace(i, endbracket - i + 1, "");
+		return;
+	}
+  std::string sVal = s.substr(i+4, endbracket - i - 4);
+  if (sVal.length() > 0) {
+// sVal = on|off|t   [ON, OFF or Toggle]
+    if (sVal.compare(0,2,"on") == 0)
+      bHighSpeed = 1;
+    else if (sVal.compare(0,3,"off") == 0)
+      bHighSpeed = 0;
+    else if (sVal.compare(0,1,"t") == 0)
+      bHighSpeed = !bHighSpeed;
+  }
+  s.replace(i, endbracket - i + 1, "");
+}
+
 
 static void pLOCK(std::string &s, size_t &i, size_t endbracket)
 {
@@ -1626,7 +1774,6 @@ static void doFILWID(std::string s)
 	qso_opBW->value(sWID.c_str());
 	cb_qso_opBW();
 	que_ok = true;
-printf("BW %s\n", sWID.c_str());
 }
 
 static void pQueFILWID(std::string &s, size_t &i, size_t endbracket)
@@ -1748,15 +1895,15 @@ void set_macro_env(void)
 
 	// frequencies
 	char dial_freq[20];
-	snprintf(dial_freq, sizeof(dial_freq), "%lld", wf->rfcarrier());
+	snprintf(dial_freq, sizeof(dial_freq), "%ld", (long)wf->rfcarrier());
 	env[FLDIGI_DIAL_FREQUENCY].val = dial_freq;
 	char audio_freq[6];
 	snprintf(audio_freq, sizeof(audio_freq), "%d", active_modem->get_freq());
 	env[FLDIGI_AUDIO_FREQUENCY].val = audio_freq;
 	char freq[20];
-	snprintf(freq, sizeof(freq), "%lld", wf->rfcarrier() + (wf->USB()
+	snprintf(freq, sizeof(freq), "%ld", (long)(wf->rfcarrier() + (wf->USB()
 								? active_modem->get_freq()
-								: -active_modem->get_freq()));
+								: -active_modem->get_freq())));
 	env[FLDIGI_FREQUENCY].val = freq;
 
 	// debugging vars
@@ -2081,6 +2228,7 @@ static const MTAGS mtags[] = {
 {"<COMMENT:",	pCOMMENT},
 {"<CALL>",		pCALL},
 {"<FREQ>",		pFREQ},
+{"<BAND>",		pBAND},
 {"<LOC>",		pLOC},
 {"<MODE>",		pMODE},
 {"<NAME>",		pNAME},
@@ -2093,6 +2241,8 @@ static const MTAGS mtags[] = {
 {"<MYRST>",		pMYRST},
 {"<ANTENNA>",	pANTENNA},
 {"<QSOTIME>",	pQSOTIME},
+{"<QSONBR>",	pQSONBR},
+{"<NXTNBR>",	pNXTNBR},
 {"<INFO1>",		pINFO1},
 {"<INFO2>",		pINFO2},
 {"<LDT>",		pLDT},
@@ -2110,6 +2260,7 @@ static const MTAGS mtags[] = {
 {"<TX>",		pTX},
 {"<TX/RX>",		pTXRX},
 {"<VER>",		pVER},
+{"<RIGCAT:",	pRIGCAT},
 {"<CNTR>",		pCNTR},
 {"<DECR>",		pDECR},
 {"<INCR>",		pINCR},
@@ -2146,6 +2297,7 @@ static const MTAGS mtags[] = {
 {"<AFC:",		pAFC},
 {"<LOCK:",		pLOCK},
 {"<REV:",		pREV},
+{"<HS:",		pHS},
 {"<RXRSID:",	pRX_RSID},
 {"<TXRSID:",	pTX_RSID},
 {"<DTMF:",		pDTMF},
@@ -2169,6 +2321,7 @@ static const MTAGS mtags[] = {
 #endif
 {"<WX>",		pWX},
 {"<WX:",		pWX2},
+{"<IMAGE:",		pQueIMAGE},
 {"<!WPM:",		pQueWPM},
 {"<!RISE:",		pQueRISETIME},
 {"<!PRE:",		pQuePRE},
@@ -2190,7 +2343,6 @@ int MACROTEXT::loadMacros(const std::string& filename)
 	std::string mLine;
 	std::string mName;
 	std::string mDef;
-	bool   inMacro = false;
 	int    mNumber = 0;
 	unsigned long int	   crlf; // 64 bit cpu's
 	char   szLine[4096];
@@ -2217,7 +2369,6 @@ int MACROTEXT::loadMacros(const std::string& filename)
 		name[i] = "";
 		text[i] = "";
 	}
-	inMacro = false;
 	while (!mFile.eof()) {
 		mFile.getline(szLine,4095);
 		mLine = szLine;
@@ -2584,8 +2735,6 @@ static std::string mtext =
 
 void MACROTEXT::saveMacros(const std::string& fname) {
 
-#if FLDIGI_FLTK_API_MAJOR == 1 && FLDIGI_FLTK_API_MINOR == 3
-
 	std::string work;
 	std::string output;
 	char temp[200];
@@ -2604,29 +2753,6 @@ void MACROTEXT::saveMacros(const std::string& fname) {
 		output.append(work).append("\n");
 	}
 	UTF8_writefile(fname.c_str(), output);
-
-#else
-
-	std::string work;
-
-	ofstream mfile(fname.c_str());
-	mfile << mtext;
-	for (int i = 0; i < MAXMACROS; i++) {
-		mfile << "\n//\n// Macro # " << i+1 << "\n";
-		mfile << "/$ " << i << " " << macros.name[i].c_str() << "\n";
-		work = macros.text[i];
-		size_t pos;
-		pos = work.find('\n');
-		while (pos != std::string::npos) {
-			work.insert(pos, "\\n");
-			pos = work.find('\n', pos + 3);
-		}
-		mfile << work.c_str();
-	}
-	mfile << "\n";
-	mfile.close();
-
-#endif
 
 	changed = false;
 }

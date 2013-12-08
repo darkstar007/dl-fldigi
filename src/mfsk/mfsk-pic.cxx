@@ -28,9 +28,6 @@
 Fl_Double_Window	*picRxWin = (Fl_Double_Window *)0;
 
 picture		*picRx = (picture *)0;
-Fl_Button	*btnpicRxSave = (Fl_Button *)0;
-Fl_Button	*btnpicRxAbort = (Fl_Button *)0;
-Fl_Button	*btnpicRxClose = (Fl_Button *)0;
 
 Fl_Double_Window	*picTxWin = (Fl_Double_Window *)0;
 
@@ -58,46 +55,13 @@ void updateRxPic(unsigned char data, int pos)
 	picRx->pixel(data, pos);
 }
 
-void cb_picRxClose( Fl_Widget *w, void *)
-{
-	picRxWin->hide();
-}
-
-void cb_picRxAbort( Fl_Widget *w, void *)
-{
-	if (serviceme != active_modem) return;
-	serviceme->rxstate = serviceme->RX_STATE_DATA;
-	put_status("");
-	picRx->clear();
-}
-
-void cb_picRxSave( Fl_Widget *w, void *)
-{
-	const char ffilter[] = "Portable Network Graphics\t*.png\n";
-	string dfname = PicsDir;
-	dfname.append("image.png");
-
-	const char *fn = FSEL::saveas(_("Save image as:"), ffilter, dfname.c_str(), NULL);
-	if (fn)
-		picRx->save_png(fn);
-}
-
 void createRxViewer()
 {
 	FL_LOCK_D();
 	picRxWin = new Fl_Double_Window(200, 140);
 	picRxWin->xclass(PACKAGE_NAME);
 	picRxWin->begin();
-
 	picRx = new picture(2, 2, 136, 104);
-	btnpicRxSave = new Fl_Button(5, 140 - 30, 60, 24,_("Save..."));
-	btnpicRxSave->callback(cb_picRxSave, 0);
-	btnpicRxSave->hide();
-	btnpicRxAbort = new Fl_Button(70, 140 - 30, 60, 24, _("Abort"));
-	btnpicRxAbort->callback(cb_picRxAbort, 0);
-	btnpicRxClose = new Fl_Button(135, 140 - 30, 60, 24, _("Hide"));
-	btnpicRxClose->callback(cb_picRxClose, 0);
-
 	picRxWin->end();
 	FL_UNLOCK_D();
 }
@@ -109,16 +73,11 @@ void showRxViewer(int W, int H)
 	int winW, winH;
 	int picX, picY;
 	winW = W < 136 ? 140 : W + 4;
-	winH = H + 34;
+	winH = H + 4;
 	picX = (winW - W) / 2;
 	picY = 2;
 	picRxWin->size(winW, winH);
 	picRx->resize(picX, picY, W, H);
-	btnpicRxSave->resize(winW/2 - 65, H + 6, 60, 24);
-	btnpicRxSave->hide();
-	btnpicRxAbort->resize(winW/2 - 65, H + 6, 60, 24);
-	btnpicRxAbort->show();
-	btnpicRxClose->resize(winW/2 + 5, H + 6, 60, 24);
 	picRx->clear();
 	picRxWin->show();
 	FL_UNLOCK_E();
@@ -138,7 +97,7 @@ void load_image(const char *n) {
 	TxImg = Fl_Shared_Image::get(n);
 	if (!TxImg)
 		return;
-	if (TxImg->count() > 1) { // we only handle rgb images
+	if (TxImg->count() > 1) {
 		TxImg->release();
 		TxImg = 0;
 		return;
@@ -227,7 +186,7 @@ void cb_picTxClose( Fl_Widget *w, void *)
 	FL_UNLOCK_D();
 }
 
-void cb_picTxSendColor( Fl_Widget *w, void *)
+void pic_TxSendColor()
 {
 	int W, H, rowstart;
 	W = TxImg->w();
@@ -262,9 +221,18 @@ void cb_picTxSendColor( Fl_Widget *w, void *)
 	btnpicTxSendAbort->show();
 	picTx->clear();
 	FL_UNLOCK_D();
+	if (!picTxWin->visible())
+		picTxWin->show();
+;
+
 // start the transmission
 	start_tx();
 	serviceme->startpic = true;
+}
+
+void cb_picTxSendColor( Fl_Widget *w, void *)
+{
+	pic_TxSendColor();
 }
 
 void cb_picTxSendGrey( Fl_Widget *w, void *)
@@ -320,13 +288,11 @@ void cb_picTxSPP( Fl_Widget *w, void *)
 	if (serviceme != active_modem) return;
 
 	Fl_Button *b = (Fl_Button *)w;
-	if (progdefaults.slowcpu == true)
-		serviceme->TXspp = 8;
-	else {
-		if (serviceme->TXspp == 8) serviceme->TXspp = 4;
-		else if (serviceme->TXspp == 4) serviceme->TXspp = 2;
-		else serviceme->TXspp = 8;
-	}
+
+	if (serviceme->TXspp == 8) serviceme->TXspp = 4;
+	else if (serviceme->TXspp == 4) serviceme->TXspp = 2;
+	else serviceme->TXspp = 8;
+
 	if (serviceme->TXspp == 8) b->label("X1");
 	else if (serviceme->TXspp == 4) b->label("X2");
 	else b->label("X4");
@@ -357,23 +323,23 @@ void createTxViewer()
 			      _("Load or drop an image file\nSupported types: PNG, JPEG, BMP"));
 	picTxBox->labelfont(FL_HELVETICA_ITALIC);
 	
-	btnpicTxSPP = new Fl_Button(5, 180 - 30, 40, 24, "X1");
+	btnpicTxSPP = new Fl_Button(5, 180 - 26, 40, 24, "X1");
 	btnpicTxSPP->tooltip(_("Transfer speed, X1-normal"));
 	btnpicTxSPP->callback( cb_picTxSPP, 0);
 		
-	btnpicTxSendColor = new Fl_Button(45, 180 - 30, 60, 24, "XmtClr");
+	btnpicTxSendColor = new Fl_Button(45, 180 - 26, 60, 24, "XmtClr");
 	btnpicTxSendColor->callback(cb_picTxSendColor, 0);
 
-	btnpicTxSendGrey = new Fl_Button(105, 180 - 30, 60, 24, "XmtGry");
+	btnpicTxSendGrey = new Fl_Button(105, 180 - 26, 60, 24, "XmtGry");
 	btnpicTxSendGrey->callback( cb_picTxSendGrey, 0);
 
-	btnpicTxSendAbort = new Fl_Button(84, 180 - 30, 122, 24, "Abort Xmt");
+	btnpicTxSendAbort = new Fl_Button(84, 180 - 26, 122, 24, "Abort Xmt");
 	btnpicTxSendAbort->callback(cb_picTxSendAbort, 0);
 
-	btnpicTxLoad = new Fl_Button(165, 180 - 30, 60, 24, _("Load"));
+	btnpicTxLoad = new Fl_Button(165, 180 - 26, 60, 24, _("Load"));
 	btnpicTxLoad->callback(cb_picTxLoad, 0);
 
-	btnpicTxClose = new Fl_Button(225, 180 - 30, 60, 24, _("Close"));
+	btnpicTxClose = new Fl_Button(225, 180 - 26, 60, 24, _("Close"));
 	btnpicTxClose->callback(cb_picTxClose, 0);
 
 	btnpicTxSendAbort->hide();
@@ -388,21 +354,21 @@ void TxViewerResize(int W, int H)
 {
 	int winW, winH;
 	int picX, picY;
-	winW = W < 288 ? 290 : W + 4;
-	winH = H < 180 ? 180 : H + 30;
+	winW = W < 286 ? 290 : W + 4;
+	winH = H < 180 ? 210 : H + 30;
 	picX = (winW - W) / 2;
-	picY =  (winH - 30 - H)/2;
+	picY = (winH - 26 - H) / 2;
 	FL_LOCK_D();
 	picTxWin->size(winW, winH);
 	picTx->resize(picX, picY, W, H);
 	picTx->clear();
 	picTxBox->size(winW, winH);
-	btnpicTxSPP->resize(winW/2 - 140, winH - 28, 40, 24);
-	btnpicTxSendColor->resize(winW/2 - 100, winH - 28, 60, 24);
-	btnpicTxSendGrey->resize(winW/2 - 40, winH - 28, 60, 24);
-	btnpicTxSendAbort->resize(winW/2 - 61, winH - 28, 122, 24);
-	btnpicTxLoad->resize(winW/2 + 20, winH - 28, 60, 24);
-	btnpicTxClose->resize(winW/2 + 80, winH - 28, 60, 24);
+	btnpicTxSPP->resize(winW/2 - 140, winH - 26, 40, 24);
+	btnpicTxSendColor->resize(winW/2 - 100, winH - 26, 60, 24);
+	btnpicTxSendGrey->resize(winW/2 - 40, winH - 26, 60, 24);
+	btnpicTxSendAbort->resize(winW/2 - 61, winH - 26, 122, 24);
+	btnpicTxLoad->resize(winW/2 + 20, winH - 26, 60, 24);
+	btnpicTxClose->resize(winW/2 + 80, winH - 26, 60, 24);
 	FL_UNLOCK_D();
 }
 
@@ -418,16 +384,16 @@ void showTxViewer(int W, int H)
 	winW = W < 288 ? 290 : W + 4;
 	winH = H < 180 ? 180 : H + 30;
 	picX = (winW - W) / 2;
-	picY =  2;
+	picY = (winH - 26 - H) / 2;
 	FL_LOCK_D();
 	picTxWin->size(winW, winH);
 	picTx->resize(picX, picY, W, H);
-	btnpicTxSPP->resize(winW/2 - 140, winH - 28, 40, 24);
-	btnpicTxSendColor->resize(winW/2 - 100, winH - 28, 60, 24);
-	btnpicTxSendGrey->resize(winW/2 - 40, winH - 28, 60, 24);
-	btnpicTxSendAbort->resize(winW/2 - 61, winH - 28, 122, 24);
-	btnpicTxLoad->resize(winW/2 + 20, winH - 28, 60, 24);
-	btnpicTxClose->resize(winW/2 + 80, winH - 28, 60, 24);
+	btnpicTxSPP->resize(winW/2 - 140, winH - 26, 40, 24);
+	btnpicTxSendColor->resize(winW/2 - 100, winH - 26, 60, 24);
+	btnpicTxSendGrey->resize(winW/2 - 40, winH - 26, 60, 24);
+	btnpicTxSendAbort->resize(winW/2 - 61, winH - 26, 122, 24);
+	btnpicTxLoad->resize(winW/2 + 20, winH - 26, 60, 24);
+	btnpicTxClose->resize(winW/2 + 80, winH - 26, 60, 24);
 	btnpicTxSPP->show();
 	btnpicTxSendColor->show();
 	btnpicTxSendGrey->show();
@@ -470,10 +436,10 @@ int print_time_left(float time_sec, char *str, size_t len,
 	time_sec -= time_min * 60;
 
 	if (time_min)
-		return snprintf(str, len, "%s%02dm%2.1fs%s",
+		return snprintf(str, len, "%s %02dm %2.1fs%s",
 				prefix, time_min, time_sec, suffix);
 	else
-		return snprintf(str, len, "%s%2.1fs%s", prefix, time_sec, suffix);
+		return snprintf(str, len, "%s %2.1fs%s", prefix, time_sec, suffix);
 }
 
 void setpicture_link(mfsk *me)

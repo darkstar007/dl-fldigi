@@ -18,8 +18,13 @@
 
 #define TWOPI (2.0 * M_PI)
 
-class modem : public morse {
+class modem {
+public:
+	static double	frequency;
+	static double	tx_frequency;
+	static bool	freqlock;
 protected:
+	cMorse	morse;
 	trx_mode mode;
 	SoundBase	*scard;
 
@@ -29,13 +34,10 @@ protected:
 	bool	reverse;
 	int		sigsearch;
 
-	bool	freqlock;
 	double	bandwidth;
-	double	frequency;
 	double	freqerr;
 	double	rx_corr;
 	double	tx_corr;
-	double	tx_frequency;
 	double  PTTphaseacc;
 	double  PTTchannel[OUTBUFSIZE];
 
@@ -77,6 +79,7 @@ public:
 	virtual void tx_init (SoundBase *sc) = 0;
 	virtual void rx_init () = 0;
 	virtual void restart () = 0;
+	virtual void rx_flush() {};
 	virtual int  tx_process () = 0;
 	virtual int  rx_process (const double *, int len) = 0;
 	virtual void shutdown(){};
@@ -119,6 +122,8 @@ public:
 
 	void		videoText();
 	void		pretone();
+
+	virtual void		send_image(std::string) {}
 
 	void		set_stopflag(bool b) { stopflag = b;};
 	bool		get_stopflag() const { return stopflag; };
@@ -202,6 +207,8 @@ extern modem *mfsk22_modem;
 extern modem *mfsk31_modem;
 extern modem *mfsk64_modem;
 extern modem *mfsk128_modem;
+extern modem *mfsk64l_modem;
+extern modem *mfsk128l_modem;
 
 extern modem *wefax576_modem;
 extern modem *wefax288_modem;
@@ -209,9 +216,12 @@ extern modem *wefax288_modem;
 extern modem *navtex_modem;
 extern modem *sitorb_modem;
 
-extern modem *mt63_500_modem;
-extern modem *mt63_1000_modem;
-extern modem *mt63_2000_modem;
+extern modem *mt63_500S_modem;
+extern modem *mt63_1000S_modem;
+extern modem *mt63_2000S_modem;
+extern modem *mt63_500L_modem;
+extern modem *mt63_1000L_modem;
+extern modem *mt63_2000L_modem;
 
 extern modem *feld_modem;
 extern modem *feld_slowmodem;

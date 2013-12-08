@@ -76,6 +76,8 @@ void loadBrowser(Fl_Widget *widget) {
 	w->add(_("<MYQTH>\tmy QTH"));
 	w->add(_("<MYRST>\tmy RST"));
 	w->add(_("<ANTENNA>\tmy antenna"));
+	w->add(_("<BAND>\toperating band"));
+	w->add(LINE_SEP);
 	w->add(_("<VER>\tFldigi version"));
 
 	w->add(LINE_SEP);
@@ -86,6 +88,8 @@ void loadBrowser(Fl_Widget *widget) {
 	w->add(_("<NAME>\tother name"));
 	w->add(_("<QTH>\tother QTH"));
 	w->add(_("<RST>\tother RST"));
+	w->add(_("<QSONBR>\t# QSO recs"));
+	w->add(_("<NXTNBR>\tnext QSO rec #"));
 	w->add(_("<MAPIT>\tmap on google"));
 	w->add(_("<MAPIT:adr/lat/loc>\tmap by value"));
  
@@ -154,6 +158,7 @@ void loadBrowser(Fl_Widget *widget) {
 
 	w->add(LINE_SEP);
 	w->add(_("<FILE:>\tinsert text file"));
+	w->add(_("<IMAGE:>\tinsert MFSK image"));
 	w->add(LINE_SEP);
 
 	w->add(_("<PAUSE>\tpause transmit"));
@@ -181,6 +186,9 @@ void loadBrowser(Fl_Widget *widget) {
 	w->add(_("<PRE:nn.n>\tCW QSK pre-timing"));
 	w->add(_("<RISE:nn.n>\tCW rise time"));
 	w->add(_("<WPM:NN:FF>\tCW WPM:Farnsworth"));
+
+	w->add(LINE_SEP);
+	w->add(_("<RIGCAT:[\"text\"][hex ...]:ret>\tsend CAT cmd"));
 
 	w->add(LINE_SEP);
 	w->add(_("<AFC:on|off|t>\tAFC  on,off,toggle"));
@@ -223,7 +231,7 @@ void loadBrowser(Fl_Widget *widget) {
 		w->add(s);
 	}
 	// add some RTTY macros
-	const char* rtty[] = { "170:45.45:5:90", "170:50:5:100", "850:75:5:150" };
+	const char* rtty[] = { "170:45.45:5", "170:50:5", "850:75:5" };
 	for (size_t i = 0; i < sizeof(rtty)/sizeof(*rtty); i++) {
 		snprintf(s, sizeof(s), "<MODEM:%s:%s>", mode_info[MODE_RTTY].sname, rtty[i]);
 		w->add(s);
@@ -311,6 +319,13 @@ void cbInsertMacro(Fl_Widget *, void *)
 					 "text." "txt");
 		if (p) {
 			text.insert(6, p);
+		} else
+			text = "";
+	} else if (text == "<IMAGE:>") {
+		string filters = "Text\t*." "txt";
+		const char *p = FSEL::select(_("MFSK image file"), "*.{png,jpg,bmp}\t*", "");
+		if (p) {
+			text.insert(7, p);
 		} else
 			text = "";
 	} else if (text == "<MACROS:>") {

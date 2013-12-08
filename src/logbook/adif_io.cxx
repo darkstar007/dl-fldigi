@@ -57,11 +57,17 @@ FIELD fields[] = {
 	{COUNTRY,        "COUNTRY",      &btnSelectCountry},   // contacted stations DXCC entity name
 	{CQZ,            "CQZ",          &btnSelectCQZ},       // contacted stations CQ Zone
 	{DXCC,           "DXCC",         &btnSelectDXCC},      // contacted stations Country Code
+	{QSL_VIA,        "QSL_VIA",      &btnSelectQSL_VIA},   // contacted stations path
 	{IOTA,           "IOTA",         &btnSelectIOTA},      // Islands on the air
 	{ITUZ,           "ITUZ",         &btnSelectITUZ},      // ITU zone
 	{CONT,           "CONT",         &btnSelectCONT},      // contacted stations continent
+
 	{MYXCHG,         "MYXCHG",       &btnSelectMyXchg},    // contest exchange sent
 	{XCHG1,          "XCHG1",        &btnSelectXchgIn},    // contest exchange #1 / free1 in xlog
+
+	{MYXCHG,         "STX_STRING",   &btnSelectMyXchg},    // contest exchange sent
+	{XCHG1,          "SRX_STRING",   &btnSelectXchgIn},    // contest exchange #1 / free1 in xlog
+
 	{SRX,            "SRX",          &btnSelectSerialIN},  // received serial number for a contest QSO
 	{STX,            "STX",          &btnSelectSerialOUT}, // QSO transmitted serial number
 	{TX_PWR,         "TX_PWR",       &btnSelectTX_pwr},    // power transmitted by this station
@@ -131,7 +137,7 @@ static inline int findfield( char *p )
 			pos = p;
 			do { *pos = toupper(*pos); } while (++pos < p1);
 			*p1 = 0;
-			pos = strstr(fastlookup, p);
+			pos = strcasestr(fastlookup, p);
 			*p1 = ':';
 			if (pos) return fields[(pos - fastlookup) / maxlen].type;
 		}
@@ -188,7 +194,6 @@ void cAdifIO::do_readfile(const char *fname, cQsoDb *db)
 	long filesize = 0;
 	char *buff;
 	int found;
-	int retval;
 
 LOG_INFO("Reading %s", fname);
 
@@ -221,8 +226,12 @@ LOG_INFO("Cannot open %s", fname);
 // read the entire file into the buffer
 
 	fseek (adiFile, 0, SEEK_SET);
-	retval = fread (buff, filesize, 1, adiFile);
+	int retval = fread (buff, filesize, 1, adiFile);
 	fclose (adiFile);
+	if (retval != 1) {
+		LOG_ERROR(_("Error reading %s"), fl_filename_name(fname));
+		return;
+	}
 
 // relaxed file integrity test to all importing from non conforming log programs
 	if (strcasestr(buff, "<CALL:") == 0) {
@@ -331,6 +340,8 @@ int cAdifIO::writeFile (const char *fname, cQsoDb *db)
 		if (rec->getField(EXPORT)[0] == 'E') {
 			int j = 0;
 			while (fields[j].type != NUMFIELDS) {
+				if (strcmp(fields[j].name,"MYXCHG") == 0) { j++; continue; }
+				if (strcmp(fields[j].name,"XCHG1") == 0) { j++; continue; }
 				if (fields[j].btn != NULL)
 					if ((*fields[j].btn)->value()) {
 					sFld = rec->getField(fields[j].type);
@@ -474,6 +485,8 @@ void cAdifIO::do_writelog()
 		record.clear();
 		int j = 0;
 		while (fields[j].type != NUMFIELDS) {
+			if (strcmp(fields[j].name,"MYXCHG") == 0) { j++; continue; }
+			if (strcmp(fields[j].name,"XCHG1") == 0) { j++; continue; }
 			sFld = rec->getField(fields[j].type);
 			if (!sFld.empty()) {
 				snprintf(recfield, sizeof(recfield), adifmt,

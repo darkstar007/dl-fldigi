@@ -41,23 +41,24 @@
 #ifndef RSID_H
 #define RSID_H
 
+#include <string>
+
 #include <samplerate.h>
 
 #include "ringbuffer.h"
 #include "globals.h"
 #include "modem.h"
-#include "fft.h"
+#include "gfft.h"
 
 #define RSID_SAMPLE_RATE 11025.0
 
-#define RSID_FFT_SAMPLES 512
-#define RSID_FFT_SIZE    1024
-#define RSID_ARRAY_SIZE	 (RSID_FFT_SIZE * 2)
+#define RSID_FFT_SAMPLES 	512
+#define RSID_FFT_SIZE		1024
+#define RSID_ARRAY_SIZE	 	(RSID_FFT_SIZE * 2)
+#define RSID_BUFFER_SIZE	(RSID_ARRAY_SIZE * 2)
 
 #define RSID_NSYMBOLS    15
-#define RSID_RESOL       2
-#define RSID_NTIMES      (RSID_NSYMBOLS * RSID_RESOL)
-#define RSID_HASH_LEN    256
+#define RSID_NTIMES      (RSID_NSYMBOLS * 2)
 #define RSID_PRECISION   2.7 // detected frequency precision in Hz
 
 // each rsid symbol has a duration equal to 1024 samples at 11025 Hz smpl rate
@@ -69,89 +70,88 @@ enum {
 	RSID_BANDWIDTH_WIDE,
 };
 
+typedef double rs_fft_type;
+typedef std::complex<rs_fft_type> rs_cpx_type;
+
 struct RSIDs { unsigned short rs; trx_mode mode; const char* name; };
 
 class cRsId {
 
 protected:
-// note: hamming distance > 5 causes false detection on second burst
-enum { HAMMING_HIGH = 2, HAMMING_MED = 4, HAMMING_LOW = 5 };// 6 };
 enum { INITIAL, EXTENDED, WAIT };
 
 private:
 	// Table of precalculated Reed Solomon symbols
-	unsigned char   *pCodes;
+	unsigned char   *pCodes1;
 	unsigned char   *pCodes2;
 
-	static const RSIDs  rsid_ids[];
-	static const int rsid_ids_size;
+	bool found1;
+	bool found2;
+
+	static const RSIDs  rsid_ids_1[];
+	static const int rsid_ids_size1;
 	static const int Squares[];
 	static const int indices[];
 
-	static const RSIDs  rsid_ids2[];
+	static const RSIDs  rsid_ids_2[];
 	static const int rsid_ids_size2;
 
-	int state;
+	int rsid_secondary_time_out;
 
 	int hamming_resolution;
 
 // Span of FFT bins, in which the RSID will be searched for
 	int		nBinLow;
 	int		nBinHigh;
-	float	aInputSamples[RSID_ARRAY_SIZE];
-	double	fftwindow[RSID_ARRAY_SIZE];
-	double  aFFTReal[RSID_ARRAY_SIZE];
-	double	aFFTAmpl[RSID_FFT_SIZE];
-	Cfft	*rsfft;
 
-	// Hashing tables
-	unsigned char	aHashTable1[RSID_HASH_LEN];
-	unsigned char	aHashTable2[RSID_HASH_LEN];
+	float			aInputSamples[RSID_ARRAY_SIZE * 2];
+	rs_fft_type		fftwindow[RSID_ARRAY_SIZE];
+	rs_cpx_type		aFFTcmplx[RSID_ARRAY_SIZE];
+	rs_fft_type		aFFTAmpl[RSID_FFT_SIZE];
 
-	unsigned char	aHashTable1_2[RSID_HASH_LEN];
-	unsigned char	aHashTable2_2[RSID_HASH_LEN];
+	g_fft<rs_fft_type>		*rsfft;
 
 	bool	bPrevTimeSliceValid;
 	int		iPrevDistance;
 	int		iPrevBin;
 	int		iPrevSymbol;
-	int		iTime; // modulo RSID_NTIMES
-	int		aBuckets[RSID_NTIMES][RSID_FFT_SIZE];
+
+	int		fft_buckets[RSID_NTIMES][RSID_FFT_SIZE];
 
 	bool	bPrevTimeSliceValid2;
 	int		iPrevDistance2;
 	int		iPrevBin2;
 	int		iPrevSymbol2;
-	int		iTime2; // modulo RSID_NTIMES
-
-	int		DistanceOut;
-	int		MetricsOut;
 
 // resample
 	SRC_STATE* 	src_state;
 	SRC_DATA	src_data;
-	float*		inptr;
+	int			inptr;
 	static long	src_callback(void* cb_data, float** data);
 
 // transmit
 	double	*outbuf;
 	size_t  symlen;
+	unsigned short rmode;
+	unsigned short rmode2;
 
 private:
 	void	Encode(int code, unsigned char *rsid);
-	int		HammingDistance(int iBucket, unsigned char *p2);
-	void	CalculateBuckets(const double *pSpectrum, int iBegin, int iEnd);
-	bool	search_amp( int &pSymbolOut, int &pBinOut);
-	bool	search_amp2( int &pSymbolOut, int &pBinOut);
 	void	search(void);
-	void	apply (int iSymbol, int iBin);
-	void	apply2 (int iSymbol, int iBin);
+	void	setup_mode(int m);
+
+	void	CalculateBuckets(const rs_fft_type *pSpectrum, int iBegin, int iEnd);
+	inline int		HammingDistance(int iBucket, unsigned char *p2);
+	bool	search_amp( int &bin_out, int &symbol_out, unsigned char *pcode_table );
+	void	apply ( int iBin, int iSymbol, int extended );
+
 public:
 	cRsId();
 	~cRsId();
 	void	reset();
 	void	receive(const float* buf, size_t len);
 	void	send(bool postidle);
+	bool	assigned(trx_mode mode);
 
 friend void reset_rsid(void *who);
 };

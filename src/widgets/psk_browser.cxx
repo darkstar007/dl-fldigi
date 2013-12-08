@@ -47,9 +47,7 @@
 using namespace std;
 
 string pskBrowser::hilite_color_1;
-string pskBrowser::hilite_color_3;
 string pskBrowser::hilite_color_2;
-string pskBrowser::bkselect;
 string pskBrowser::white;
 string pskBrowser::bkgnd[2];
 
@@ -68,10 +66,11 @@ pskBrowser::pskBrowser(int x, int y, int w, int h, const char *l)
 	cols[0] = 80; cols[1] = 0;
 	evalcwidth();
 
-	HiLite_1 = fl_rgb_color(128, 0, 0);
-	HiLite_2 = fl_rgb_color(0, 128, 0);
-	HiLite_3 = fl_rgb_color(0, 0, 128);
-
+	HiLite_1 = FL_RED;
+	HiLite_2 = FL_GREEN;
+	BkSelect = FL_BLUE;
+	Backgnd1 = (Fl_Color)55;
+	Backgnd2 = (Fl_Color)53;
 	makecolors();
 	cdistiller = reinterpret_cast<CharsetDistiller*>(operator new(MAXCHANNELS*sizeof(CharsetDistiller)));
 
@@ -106,6 +105,7 @@ void pskBrowser::evalcwidth()
 	const char *szRF = " 999999.99";
 	const char *szCH = " 99";
 	cwidth = (int)fl_width("W");
+	if (cwidth <= 0) cwidth = 5;
 	cheight = fl_height();
 	labelwidth[VIEWER_LABEL_OFF] = 1;//cwidth;
 	labelwidth[VIEWER_LABEL_AF] = (int)fl_width(szAF);
@@ -138,8 +138,8 @@ string pskBrowser::freqformat(int i) // 0 < i < channels
 			sprintf(szLine, "    ");
 			break;
 	}
-	fline = bkselect;
-	fline.append(white).append("@r").append(szLine).append("\t").append(bkgnd[i%2]);
+	fline = white;
+	fline.append("@r").append(szLine).append("\t").append(bkgnd[i%2]);
 
 	return fline;
 }
@@ -179,7 +179,7 @@ void pskBrowser::resize(int x, int y, int w, int h)
 	if (w) {
 		Fl_Hold_Browser::resize(x,y,w,h);
 		evalcwidth();
-		nchars = (w - cols[0] - (sbarwidth + 2 * BWSR_BORDER)) / cwidth;
+		nchars = (w - cols[0] - (sbarwidth + 2*BWSR_BORDER)) / cwidth;
 		nchars = nchars < 1 ? 1 : nchars; 
 		string bline;
 		Fl_Hold_Browser::clear();
@@ -202,30 +202,22 @@ void pskBrowser::resize(int x, int y, int w, int h)
 void pskBrowser::makecolors()
 {
 	char tempstr[20];
-
-	snprintf(tempstr, sizeof(tempstr), "@C%d", HiLite_1);
+       
+	snprintf(tempstr, sizeof(tempstr), "@C%u", HiLite_1);
 	hilite_color_1 = tempstr;
 
-	snprintf(tempstr, sizeof(tempstr), "@C%d", HiLite_2);
+	snprintf(tempstr, sizeof(tempstr), "@C%u", HiLite_2);
 	hilite_color_2 = tempstr;
 
-	snprintf(tempstr, sizeof(tempstr), "@C%d", HiLite_3);
-	hilite_color_3 = tempstr;
-
-	snprintf(tempstr, sizeof(tempstr), "@C%d", FL_FOREGROUND_COLOR); // foreground
+	snprintf(tempstr, sizeof(tempstr), "@C%u", FL_FOREGROUND_COLOR); // foreground
 	white = tempstr;
 
-	snprintf(tempstr, sizeof(tempstr), "@B%d",
-		 adjust_color(FL_BACKGROUND2_COLOR, FL_FOREGROUND_COLOR)); // default selection color bkgnd
-	bkselect = tempstr;
+	selection_color(BkSelect);
 
-	snprintf(tempstr, sizeof(tempstr), "@B%d", FL_BACKGROUND2_COLOR); // background for odd rows
+	snprintf(tempstr, sizeof(tempstr), "@B%u", Backgnd1); // background for odd rows
 	bkgnd[0] = tempstr;
 
-	Fl_Color bg2 = fl_color_average(FL_BACKGROUND2_COLOR, FL_BLACK, .9);
-	if (bg2 == FL_BLACK)
-		bg2 = fl_color_average(FL_BACKGROUND2_COLOR, FL_WHITE, .9);
-	snprintf(tempstr, sizeof(tempstr), "@B%d", adjust_color(bg2, FL_FOREGROUND_COLOR)); // even rows
+	snprintf(tempstr, sizeof(tempstr), "@B%u", Backgnd2); // background for even rows
 	bkgnd[1] = tempstr;
 }
 
@@ -237,7 +229,7 @@ void pskBrowser::addchr(int ch, int freq, unsigned char c, int md) // 0 < ch < c
 	if (c == '\n') c = ' ';
 	if (c < ' ') return;
 
-	nchars = (w() - cols[0] - (sbarwidth + 2 * BWSR_BORDER)) / cwidth;
+	nchars = (w() - cols[0] - (sbarwidth + 2*BWSR_BORDER)) / cwidth;
 	nchars = nchars < 1 ? 1 : nchars; 
 
 	bwsrfreq[ch] = freq;
@@ -258,11 +250,7 @@ void pskBrowser::addchr(int ch, int freq, unsigned char c, int md) // 0 < ch < c
 	if (linechars[ch] > nchars) {
 		if (progdefaults.VIEWERmarquee) {
 			while (linechars[ch] > nchars) {
-#if FLDIGI_FLTK_API_MAJOR == 1 && FLDIGI_FLTK_API_MINOR == 3
 				bwsrline[ch].erase(0, fl_utf8len1(bwsrline[ch][0]));
-#else
-				bwsrline[ch].erase(0, 1);
-#endif
 				linechars[ch]--;
 			}
 		} else {

@@ -99,7 +99,7 @@ void Digiscope::video(double *data, int len , bool dir)
 	FL_AWAKE_D();
 }
 
-void Digiscope::zdata(complex *zarray, int len )
+void Digiscope::zdata(cmplx *zarray, int len )
 {
 	if (active_modem->HistoryON()) return;
 	
@@ -274,7 +274,7 @@ void Digiscope::draw_phase()
 
 void Digiscope::draw_scope()
 {
-	int npts;
+	int npts, np;
 	fl_clip(x()+2,y()+2,w()-4,h()-4);
 	fl_color(FL_BLACK);
 	fl_rectf(x()+2,y()+2,w()-4,h()-4);
@@ -285,8 +285,11 @@ void Digiscope::draw_scope()
 	fl_scale ((w()-4), - (h() - 4));
 	fl_color(FL_GREEN);
 	fl_begin_line();
-	for (int i = 0; i < npts; i++)
-		fl_vertex( (double)i / npts, _buf[i * _len / npts] );
+	for (int i = 0; i < npts; i++) {
+		np = i * _len / npts;
+		np = np < MAX_LEN ? np : MAX_LEN - 1;
+		fl_vertex( (double)i / npts, _buf[np] );
+	}
 	fl_end_line();
 
 // x & y axis'
@@ -358,14 +361,14 @@ void Digiscope::draw_xy()
 	int xp, yp, xp1, yp1;
 	int j = _zptr;
 	if (++j == MAX_ZLEN) j = 0;
-	xp = X + (int)((_zdata[j].re + 1.0) * W);
-	yp = Y + (int)((_zdata[j].im + 1.0) * H);
+	xp = X + (int)((_zdata[j].real() + 1.0) * W);
+	yp = Y + (int)((_zdata[j].imag() + 1.0) * H);
 
 	fl_color(fl_rgb_color(0, 230,0));
 	for (int i = 0; i <  MAX_ZLEN; i++ ) {
 		if (++j == MAX_ZLEN) j = 0;
-		xp1 = X + (int)((_zdata[j].re + 1.0) * W);
-		yp1 = Y + (int)((_zdata[j].im + 1.0) * H);
+		xp1 = X + (int)((_zdata[j].real() + 1.0) * W);
+		yp1 = Y + (int)((_zdata[j].imag() + 1.0) * H);
 		fl_line(xp, yp, xp1, yp1);
 		xp = xp1; yp = yp1;
 	}
@@ -376,7 +379,7 @@ void Digiscope::draw_xy()
 
 void Digiscope::draw_rtty()
 {
-	int npts;
+	int npts, np;
 	fl_clip(x()+2,y()+2,w()-4,h()-4);
 	fl_color(FL_BLACK);
 	fl_rectf(x()+2,y()+2,w()-4,h()-4);
@@ -396,8 +399,11 @@ void Digiscope::draw_rtty()
 	fl_end_line();
 	fl_color(FL_GREEN);
 	fl_begin_line();
-	for (int i = 0; i < npts; i++)
-		fl_vertex( (double)i / npts, 0.5 + 0.75 * _buf[i * _len / npts] );
+	for (int i = 0; i < npts; i++) {
+		np = i * _len / npts;
+		np = np < MAX_LEN ? np : MAX_LEN - 1;
+		fl_vertex( (double)i / npts, 0.5 + 0.75 * _buf[np] );
+	}
 	fl_end_line();
 	fl_pop_matrix();
 	fl_pop_clip();

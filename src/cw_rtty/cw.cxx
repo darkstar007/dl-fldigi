@@ -518,9 +518,9 @@ void cw::clear_syncscope()
 	clrcount = CLRCOUNT;
 }
 
-complex cw::mixer(complex in)
+cmplx cw::mixer(cmplx in)
 {
-	complex z (cos(phaseacc), sin(phaseacc));
+	cmplx z (cos(phaseacc), sin(phaseacc));
 	z = z * in;
 
 	phaseacc += TWOPI * frequency / samplerate;
@@ -599,12 +599,12 @@ void cw::decode_stream(double value)
 
 void cw::rx_FFTprocess(const double *buf, int len)
 {
-	complex z, *zp;
+	cmplx z, *zp;
 	int n;
 
 	while (len-- > 0) {
 
-		z = complex ( *buf * cos(FFTphase), *buf * sin(FFTphase) );
+		z = cmplx ( *buf * cos(FFTphase), *buf * sin(FFTphase) );
 		FFTphase += TWOPI * frequency / samplerate;
 		if (FFTphase > M_PI)
 			FFTphase -= TWOPI;
@@ -624,7 +624,7 @@ void cw::rx_FFTprocess(const double *buf, int len)
 			if (smpl_ctr % DEC_RATIO) continue; // decimate by DEC_RATIO
 
 // demodulate
-			FFTvalue = zp[i].mag();
+			FFTvalue = abs(zp[i]);
 			FFTvalue = bitfilter->run(FFTvalue);
 
 			decode_stream(FFTvalue);
@@ -636,10 +636,10 @@ void cw::rx_FFTprocess(const double *buf, int len)
 
 void cw::rx_FIRprocess(const double *buf, int len)
 {
-	complex z;
+	cmplx z;
 
 	while (len-- > 0) {
-		z = complex ( *buf * cos(FIRphase), *buf * sin(FIRphase) );
+		z = cmplx ( *buf * cos(FIRphase), *buf * sin(FIRphase) );
 		buf++;
 
 		FIRphase += TWOPI * frequency / samplerate;
@@ -653,7 +653,7 @@ void cw::rx_FIRprocess(const double *buf, int len)
 // update the basic sample counter used for morse timing
 			smpl_ctr += DEC_RATIO;
 // demodulate
-			FIRvalue = z.mag();
+			FIRvalue = abs(z);
 			FIRvalue = bitfilter->run(FIRvalue);
 
 			decode_stream(FIRvalue);
@@ -840,7 +840,7 @@ int cw::handle_event(int cw_event, const char **c)
 			cw_receive_state == RS_AFTER_TONE) {
 // Look up the representation
 //cout << "CW_QUERY medium time after keyup: " << rx_rep_buf;
-			*c = morse::rx_lookup(rx_rep_buf);
+			*c = morse.rx_lookup(rx_rep_buf);
 //cout <<": " << *c <<flush;
 			if (*c == NULL) {
 // invalid decode... let user see error
@@ -1128,7 +1128,7 @@ void cw::send_ch(int ch)
 
 // convert character code to a morse representation
 	if ((chout < 256) && (chout >= 0)) {
-		code = tx_lookup(chout); //cw_tx_lookup(ch);
+		code = morse.tx_lookup(chout); //cw_tx_lookup(ch);
 		firstelement = true;
 	} else {
 		code = 0x04; 	// two extra dot spaces
@@ -1163,7 +1163,7 @@ void cw::send_ch(int ch)
 	FL_AWAKE();
 
 	if (ch != -1) {
-		string prtstr = tx_print(ch);
+		string prtstr = morse.tx_print(ch);
 		if (prtstr.length() == 1)
 			put_echo_char(progdefaults.rx_lowercase ? tolower(prtstr[0]) : prtstr[0]);
 		else
@@ -1186,7 +1186,7 @@ int cw::tx_process()
 		prosigns != progdefaults.CW_prosigns) {
 		use_paren = progdefaults.CW_use_paren;
 		prosigns = progdefaults.CW_prosigns;
-		morse::init();
+		morse.init();
 	}
 
 	c = get_tx_char();

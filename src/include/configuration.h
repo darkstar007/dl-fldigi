@@ -26,6 +26,7 @@
 #define _CONFIGURATION_H
 
 #include <string>
+#include <math.h>
 
 #include "rtty.h"
 #include "waterfall.h"
@@ -70,9 +71,9 @@
 #endif
 
 #define CONFIG_LIST                                                                     \
-	ELEM_(bool, confirmExit, "CONFIRMEXIT",				                \
-	      "Ensure user wants to leave flgidi",			                \
-	      false)							                \
+    ELEM_(bool, confirmExit, "CONFIRMEXIT",                                             \
+          "Ensure user wants to leave flgidi",                                          \
+          false)                                                                        \
         ELEM_(bool, SaveConfig, "SAVECONFIG",                                           \
               "Save current configuration on exit",                                     \
               false)                                                                    \
@@ -114,14 +115,21 @@
               "Mode names for which RSID transmission is disabled",                     \
               mode_set_t())                                                             \
                                                                                         \
-        ELEM_(int, rsid_resolution, "RSID_RESOLUTION",                                  \
-              "values (LOW)  5, 4, 3, 2 (HIGH)",                                        \
-              5)                                                                        \
-                                                                                        \
+        ELEM_(int, RsID_label_type, "RSID_ERRORS",                                      \
+              "values (low, medium, high)  0, 1, 2",                                    \
+              1)                                                                        \
+        ELEM_(bool, disable_rsid_warning_dialog_box, "DISABLE_RSID_WARNING_DIALOG_BOX", \
+              "disable displaying the rsid warning dialog box",                         \
+              false)                                                                    \
         ELEM_(bool, slowcpu, "SLOWCPU",                                                 \
               "Disable expensive processing in some decoders",                          \
               true)                                                                     \
-                                                                                        \
+        ELEM_(bool, disable_rsid_freq_change, "DISABLERSIDFREQCHANGE",                  \
+              "disable changing frequency on rsid modem change/reset",                  \
+              false)                                                                    \
+		ELEM_(bool, retain_freq_lock, "RETAINFREQLOCK",                                 \
+			 "retain frequency lock on rsid modem change/reset",                   \
+			 false)                                                                     \
         ELEM_(bool, changed, "", "",  false)                                            \
                                                                                         \
         ELEM_(double, wfRefLevel, "WFREFLEVEL",                                         \
@@ -211,6 +219,9 @@
         ELEM_(bool, rx_lowercase, "RX_LOWERCASE",                                       \
               "Print Rx in lowercase for CW, RTTY, CONTESTIA and THROB",                \
               false)                                                                    \
+        ELEM_(bool, tx_lowercase, "TX_LOWERCASE",                                       \
+              "Transmit all text in lowercase",                                         \
+              false)                                                                    \
         /* PSK, filter can be 0, 1, 2, 3 or 4 */                                        \
         ELEM_(int, PSK_filter, "PSKFILTER",                                             \
               "Not configurable; must always be 0",                                     \
@@ -271,6 +282,19 @@
         ELEM_(double, RTTY_BW, "RTTYBW",                                                \
               "Receive filter bandwidth (Hz)",                                          \
               68.0)                                                                     \
+        ELEM_(int, rtty_cwi, "RTTYCWI",                                                 \
+              "Selective decoding of mark/space tones\n"                                \
+              "0 - both\n"                                                              \
+              "1 - mark only\n"                                                         \
+              "2 - space only",                                                         \
+              0)                                                                        \
+        ELEM_(double, rtty_filter, "RTTYFILTER",                                        \
+              "Rtty Rx Filter shape factor, K * (t/T)\n"                                \
+              "You may alter this value using a text editor\n"                          \
+              "change will be effective when restarting fldigi\n"                       \
+              "K = 1.25; best for W1HKJ (default)\n"                                    \
+              "K = 1.5 - best for DO2SMF",                                              \
+              1.25)                                                                     \
         ELEM_(int, rtty_baud, "RTTYBAUD",                                               \
               "Carrier baud rate. Values are as follows:\n"                             \
               "  1: 45; 1: 45.45; 2: 50; 3: 56; 4: 75; 5: 100; 6: 110; 7: 150; \n"      \
@@ -307,12 +331,6 @@
               "AFC tracking speed. Values are as follows:\n"                            \
               "  0: slow; 1: normal; 2: fast",                                          \
               1)   /* normal */                                                         \
-        ELEM_(int, rtty_filter_quality, "RTTYFILTERQUALITY",                            \
-              "DSP filter length:\n"                                                    \
-              "  0: low, 512, low cpu load\n"                                           \
-              "  1: normal, 1024, medium cpu load\n"                                    \
-              "  2: high, 2048, high cpu load",                                         \
-              1)   /* normal */                                                         \
         ELEM_(bool, useFSKkeyline, "", "",  false)                                      \
         ELEM_(bool, useFSKkeylineDTR, "", "",  false)                                   \
         ELEM_(bool, FSKisLSB, "", "",  true)                                            \
@@ -322,6 +340,15 @@
               false)                                                                    \
         ELEM_(bool, PseudoFSK, "PSEUDOFSK",                                             \
               "Generate Pseudo-FSK signal on right audio channel",                      \
+              false)                                                                    \
+        ELEM_(bool, SynopAdifDecoding, "SYNOPADIFDECODING",                             \
+              "Decoding of Synop weather information on RTTY to ADIF log",              \
+              false)                                                                    \
+        ELEM_(bool, SynopKmlDecoding, "SYNOPKMLDECODING",                               \
+              "Decoding of Synop weather information on RTTY to KML file",              \
+              false)                                                                    \
+        ELEM_(bool, SynopInterleaved, "SYNOPINTERLEAVED",                               \
+              "Decoding of Synop interleaved with coded text, or replaces it",          \
               false)                                                                    \
         ELEM_(bool, UOSrx, "UOSRX",                                                     \
               "Revert to unshifted chars on a space (RX)",                              \
@@ -491,6 +518,9 @@
         ELEM_(bool, contestia8bit, "CONTESTIA8BIT",                                     \
               "8-bit extended characters",                                              \
               true)                                                                     \
+		ELEM_(bool, contestia_reset_fec, "CONTESTIARESETFEC",                           \
+		      "Force Integration (FEC) depth to be reset when new BW/Tones selected",   \
+			  false)                                                                    \
         /* THOR */                                                                      \
         ELEM_(double, THOR_BW, "THORBW",                                                \
               "Filter bandwidth factor (bandwidth relative to signal width)",           \
@@ -585,10 +615,6 @@
         ELEM_(bool, mt63_8bit, "MT638BIT",                                              \
               "8-bit extended characters",                                              \
               true)                                                                     \
-        ELEM_(int, mt63_interleave, "MT63INTERLEAVE",                                   \
-              "64-bit (long) interleave.  Values are as follows:\n"                     \
-              "  0: short (32-bit); 1: long (64-bit).",                                 \
-              1) /* long interleave */                                                  \
         ELEM_(bool, mt63_rx_integration, "MT63INTEGRATION",                             \
               "Long receive integration",                                               \
               false)                                                                    \
@@ -616,9 +642,9 @@
         ELEM_(bool, WFaveraging, "WFAVERAGING",                                         \
               "Use FFT averaging to decrease waterfall noise",                          \
               false)                                                                    \
-        ELEM_(int, latency, "LATENCY",                                                  \
-              "Waterfal FFT latency (scan merging)",                                    \
-              4)                                                                        \
+        ELEM_(int, wf_latency, "WF_LATENCY",                                            \
+              "Waterfal latency, 1...16",                                               \
+              8)                                                                        \
         ELEM_(bool, UseCursorLines, "USECURSORLINES",                                   \
               "Draw cursor with vertical lines",                                        \
               true)                                                                     \
@@ -1030,6 +1056,14 @@
         ELEM_(int, TxOffset, "TXOFFSET",                                                \
               "Difference between RX and TX freq (rig offset)",                         \
               0)                                                                        \
+        ELEM_(int, wavSampleRate, "WAV_SAMPLERATE",                                     \
+              "Wave file record sample rate\n"                                          \
+              "0 - 22050, 1 - 24000, 2 - 44100, 3 - 48000",                             \
+              3)                                                                        \
+        ELEM_(bool, loop_playback, "LOOPPLAYBACK",                                      \
+              "true = continuous loop of sound file playback\n"                         \
+              "false = single pass through playback file.",                             \
+              false)                                                                    \
         ELEM_(int, PTT_on_delay, "PTTONDELAY",                                          \
               "Start of transmit delay before sending audio",                           \
               0)                                                                        \
@@ -1055,15 +1089,21 @@
         ELEM_(RGB, bwsrSldrSelColor,"BWSRSLDRSELCOLOR",                                 \
               "Button highlight color, signal browser detect level",                    \
               {54, 100, 139})                                                           \
-        ELEM_(RGB, bwsrHiLight1, "BWSRHILIGHT1",                                        \
+        ELEM_(int, bwsrHiLight1, "BWSRHILIGHT1",                                        \
               "View Browser highlight color 1, default Dark Red",                       \
-              {128, 0, 0})                                                              \
-        ELEM_(RGB, bwsrHiLight2, "BWSRHILIGHT2",                                        \
+              FL_RED)                                                                   \
+        ELEM_(int, bwsrHiLight2, "BWSRHILIGHT2",                                        \
               "View Browser highlight color 2, default Dark Green",                     \
-              {0, 128, 0})                                                              \
-        ELEM_(RGB, bwsrHiLight3, "BWSRHILIGHT3",                                        \
-              "View Browser highlight color 3, default Dark Blue",                      \
-              {0, 0, 128})                                                              \
+              FL_GREEN)                                                                 \
+        ELEM_(int, bwsrBackgnd1, "BWSRBACKGND1",                                        \
+              "View Browser background odd lines",                                      \
+              55)                                                                       \
+        ELEM_(int, bwsrBackgnd2, "BWSRBACKGND2",                                        \
+              "View Browser background odd lines",                                      \
+              53)                                                                       \
+        ELEM_(int, bwsrSelect, "BWSRSELECT",                                            \
+              "View Browser line select color",                                         \
+              FL_BLUE)                                                                  \
         ELEM_(RGB, dup_color, "dupcolor",                                               \
               "Callsign background color when duplicate detected",                      \
               {255, 110, 180})                                                          \
@@ -1145,7 +1185,7 @@
               "This setting is currently unused",                                       \
               true)                                                                     \
         ELEM_(double, TxMonitorLevel, "TXMONITORLEVEL",                                 \
-              "Level for monitored (on watrerfall) transmit signal",                    \
+              "Level for monitored (on waterfall) transmit signal",                     \
               0.5)                                                                      \
         /* Waterfall palette */                                                         \
         ELEM_(std::string, PaletteName, "PALETTENAME",                                  \
@@ -1197,7 +1237,7 @@
         /* RX / TX / Waterfall text widgets */                                          \
         ELEM_(std::string, charset_name, "CHARSET_NAME",                                \
               "Default character set",                                                  \
-              "ASCII")                                                                  \
+              "UTF-8")                                                                  \
         ELEM_(std::string, RxFontName, "RXFONTNAME",                                    \
               "RX text font name",                                                      \
               "")                                                                       \
@@ -1426,6 +1466,9 @@
         ELEM_(bool, pskrep_qrg, "PSKREPQRG",                                            \
               "Include rig frequency in reception report",                              \
               false)                                                                    \
+        ELEM_(bool, report_when_visible, "REPORTWHENVISIBLE",                           \
+              "Enable Reporter ONLY when a signal browser is visible",                  \
+              false)                                                                    \
         ELEM_(std::string, pskrep_host, "PSKREPHOST",                                   \
               "Reception report server address",                                        \
               "report.pskreporter.info")                                                \
@@ -1524,43 +1567,111 @@
        ELEM_(bool, NVTX_AdifLog, "NAVTEXADIFLOG",                                       \
              "Logs Navtex messages in Adig log file",                                   \
              false)                                                                     \
-       ELEM_(std::string, NVTX_Catalog, "NAVTEXCATALOG",                                \
-             "Catalog pathname of Navtex stations",                                     \
-             PKGDATADIR "/NAVTEX_Stations.csv")                                         \
+       ELEM_(bool, NVTX_KmlLog, "NAVTEXKMLLOG",                                         \
+             "Logs Navtex messages to KML document",                                    \
+             false)                                                                     \
        ELEM_(int, NVTX_MinSizLoggedMsg, "NAVTEXMINSIZLOGGEDMSG",                        \
              "Minimum length of logged messages",                                       \
              0 )                                                                        \
         /* WX fetch from NOAA */                                                        \
+        ELEM_(std::string, wx_eoh, "WX_EOH",                                            \
+             "Text at end of METAR report header\n"                                     \
+             "default = Connection: close",                                             \
+             "Connection: close")                                                       \
         ELEM_(std::string, wx_sta, "WX_STA",                                            \
               "4 letter specifier for wx station",                                      \
               "KMDQ")                                                                   \
         ELEM_(bool, wx_condx, "WX_CONDX",                                               \
-              "weather conditions",                                                     \
+              "Weather conditions",                                                     \
               true)                                                                     \
         ELEM_(bool, wx_fahrenheit, "WX_FAHRENHEIT",                                     \
-              "report in Fahrenheit",                                                   \
+              "Report in Fahrenheit",                                                   \
               true)                                                                     \
         ELEM_(bool, wx_celsius, "WX_CELSIUS",                                           \
-              "report in Celsius",                                                      \
+              "Report in Celsius",                                                      \
               true)                                                                     \
         ELEM_(bool, wx_mph, "WX_MPH",                                                   \
-              "report speed in miles per hour",                                         \
+              "Report speed in miles per hour",                                         \
               true)                                                                     \
         ELEM_(bool, wx_kph, "WX_KPH",                                                   \
-              "report speed in kilometers per hour",                                    \
+              "Report speed in kilometers per hour",                                    \
               true)                                                                     \
         ELEM_(bool, wx_inches, "WX_INCHES",                                             \
-              "report pressure in inches of mercury",                                   \
+              "Report pressure in inches of mercury",                                   \
               true)                                                                     \
         ELEM_(bool, wx_mbars, "WX_MBARS",                                               \
-              "report pressure in millibars",                                           \
+              "Report pressure in millibars",                                           \
               true)                                                                     \
         ELEM_(bool, wx_full, "WX_FULL",                                                 \
-              "use complete METAR report",                                              \
+              "Use complete METAR report",                                              \
               true)                                                                     \
         ELEM_(bool, wx_station_name, "WX_STATION_NAME",                                 \
-              "report station noun name",                                               \
+              "Report station noun name",                                               \
               true)                                                                     \
+	/* KML Keyhole Markup Language */                                               \
+        ELEM_(bool, kml_purge_on_startup, "KML_PURGE_ON_STARTUP",                       \
+              "Purge KML data at startup",                                              \
+              false)                                                                    \
+       ELEM_(std::string, kml_save_dir, "KML_SAVE_DIR",                                 \
+             "Destination directory for generated KML documents",                       \
+             "")                                                                        \
+       ELEM_(std::string, kml_command, "KML_COMMAND",                                   \
+             "Command executed when creating KML files",                                \
+             "")                                                                        \
+       ELEM_(int, kml_merge_distance, "KML_MERGE_DISTANCE",                             \
+             "Minimum distance for splitting alias nodes",                              \
+             10000)                                                                     \
+       ELEM_(int, kml_retention_time, "KML_RETENTION_TIME",                             \
+             "Number of hours for keeping data in each node",                           \
+             0)                                                                         \
+       ELEM_(int, kml_refresh_interval, "KML_REFRESH_INTERVAL",                         \
+             "Refresh interval written in KML files (In seconds)",                      \
+             120)                                                                       \
+       ELEM_(int, kml_balloon_style, "KML_BALLOON_STYLE",                               \
+             "KML balloons data displayed as text, HTML tables, HTML single matrix",    \
+             2)                                                                         \
+        ELEM_(std::string, auto_flrig_pathname, "AUTO_FLRIG_PATHNAME",                  \
+              "Full pathname to the flrig executable",                                  \
+              "")                                                                       \
+        ELEM_(std::string, auto_flamp_pathname, "AUTO_FLAMP_PATHNAME",                  \
+              "Full pathname to the flamp executable",                                  \
+              "")                                                                       \
+        ELEM_(std::string, auto_flnet_pathname, "AUTO_FLNET_PATHNAME",                  \
+              "Full pathname to the flnet executable",                                  \
+              "")                                                                       \
+        ELEM_(std::string, auto_fllog_pathname, "AUTO_FLLOG_PATHNAME",                  \
+              "Full pathname to the fllog executable",                                  \
+              "")                                                                       \
+        ELEM_(std::string, auto_prog1_pathname, "AUTO_PROG1_PATHNAME",                  \
+              "Full pathname to the prog1 executable",                                  \
+              "")                                                                       \
+        ELEM_(std::string, auto_prog2_pathname, "AUTO_PROG2_PATHNAME",                  \
+              "Full pathname to the prog2 executable",                                  \
+              "")                                                                       \
+        ELEM_(std::string, auto_prog3_pathname, "AUTO_PROG3_PATHNAME",                  \
+              "Full pathname to the prog3 executable",                                  \
+              "")                                                                       \
+        ELEM_(bool, flrig_auto_enable, "FLRIG_AUTO_ENABLE",                             \
+              "Enable on program start",                                                \
+              false)                                                                    \
+        ELEM_(bool, flnet_auto_enable, "FLNET_AUTO_ENABLE",                             \
+              "Enable on program start",                                                \
+              false)                                                                    \
+        ELEM_(bool, fllog_auto_enable, "FLLOG_AUTO_ENABLE",                             \
+              "Enable on program start",                                                \
+              false)                                                                    \
+        ELEM_(bool, flamp_auto_enable, "FLAMP_AUTO_ENABLE",                             \
+              "Enable on program start",                                                \
+              false)                                                                    \
+        ELEM_(bool, prog1_auto_enable, "PROG1_AUTO_ENABLE",                             \
+              "Enable on program start",                                                \
+              false)                                                                    \
+        ELEM_(bool, prog2_auto_enable, "PROG2_AUTO_ENABLE",                             \
+              "Enable on program start",                                                \
+              false)                                                                    \
+        ELEM_(bool, prog3_auto_enable, "PROG3_AUTO_ENABLE",                             \
+              "Enable on program start",                                                \
+              false)                                                                    \
 
 
 // declare the struct

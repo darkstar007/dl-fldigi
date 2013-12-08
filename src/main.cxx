@@ -83,7 +83,6 @@
 #include "rigio.h"
 #include "globals.h"
 #include "confdialog.h"
-#include "colorsfonts.h"
 #include "configuration.h"
 #include "macros.h"
 #include "status.h"
@@ -96,6 +95,7 @@
 #include "dxcc.h"
 #include "newinstall.h"
 #include "Viewer.h"
+#include "kmlserver.h"
 
 #if USE_HAMLIB
 	#include "rigclass.h"
@@ -107,9 +107,7 @@
 #include "qrunner.h"
 #include "stacktrace.h"
 
-#if USE_XMLRPC
-	#include "xmlrpc.h"
-#endif
+#include "xmlrpc.h"
 
 #if BENCHMARK_MODE
 	#include "benchmark.h"
@@ -118,6 +116,7 @@
 #include "icons.h"
 
 #include "dl_fldigi/dl_fldigi.h"
+#include "nullmodem.h"
 
 using namespace std;
 
@@ -138,9 +137,11 @@ string MacrosDir = "";
 string WrapDir = "";
 string TalkDir = "";
 string TempDir = "";
+string KmlDir = "";
 string PskMailDir = "";
 
 string NBEMS_dir = "";
+string DATA_dir = "";
 string ARQ_dir = "";
 string ARQ_files_dir = "";
 string ARQ_recv_dir = "";
@@ -181,12 +182,6 @@ bool	mailserver = false, mailclient = false, arqmode = false;
 static bool show_cpucheck = false;
 static bool iconified = false;
 
-RXMSGSTRUC rxmsgst;
-int		rxmsgid = -1;
-
-TXMSGSTRUC txmsgst;
-int txmsgid = -1;
-
 string option_help, version_text, build_text;
 
 qrunner *cbq[NUM_QRUNNER_THREADS];
@@ -201,7 +196,8 @@ double speed_test(int converter, unsigned repeat);
 static void setup_signal_handlers(void);
 static void checkdirectories(void);
 
-static void arg_error(const char* name, const char* arg, bool missing) noreturn__;
+static void arg_error(const char* name, const char* arg, bool missing);
+static void fatal_error(string);
 
 // TODO: find out why fldigi crashes on OS X if the wizard window is
 // shown before fldigi_main.
@@ -210,6 +206,70 @@ static void arg_error(const char* name, const char* arg, bool missing) noreturn_
 #else
 #  define SHOW_WIZARD_BEFORE_MAIN_WINDOW 0
 #endif
+
+void start_process(string executable)
+{
+	if (!executable.empty()) {
+#ifndef __MINGW32__
+		switch (fork()) {
+		case -1:
+			LOG_PERROR("fork");
+			// fall through
+		default:
+			break;
+		case 0:
+#endif
+#ifdef __MINGW32__
+			char* cmd = strdup(executable.c_str());
+			STARTUPINFO si;
+			PROCESS_INFORMATION pi;
+			memset(&si, 0, sizeof(si));
+			si.cb = sizeof(si);
+			memset(&pi, 0, sizeof(pi));
+			if (!CreateProcess(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi))
+				LOG_ERROR("CreateProcess failed with error code %ld", GetLastError());
+			CloseHandle(pi.hProcess);
+			CloseHandle(pi.hThread);
+			free(cmd);
+#else
+			execl("/bin/sh", "sh", "-c", executable.c_str(), (char *)NULL);
+			perror("execl");
+			exit(EXIT_FAILURE);
+		}
+#endif
+	}
+}
+
+static void auto_start()
+{
+	if (!progdefaults.auto_flrig_pathname.empty() &&
+		 progdefaults.flrig_auto_enable)
+		start_process(progdefaults.auto_flrig_pathname);
+		
+	if (!progdefaults.auto_flamp_pathname.empty() &&
+		 progdefaults.flamp_auto_enable)
+		start_process(progdefaults.auto_flamp_pathname);
+		
+	if (!progdefaults.auto_fllog_pathname.empty() &&
+		 progdefaults.fllog_auto_enable)
+		start_process(progdefaults.auto_fllog_pathname);
+		
+	if (!progdefaults.auto_flnet_pathname.empty() &&
+		 progdefaults.flnet_auto_enable)
+		start_process(progdefaults.auto_flnet_pathname);
+		
+	if (!progdefaults.auto_prog1_pathname.empty() &&
+		 progdefaults.prog1_auto_enable)
+		start_process(progdefaults.auto_prog1_pathname);
+		
+	if (!progdefaults.auto_prog2_pathname.empty() &&
+		 progdefaults.prog2_auto_enable)
+		start_process(progdefaults.auto_prog2_pathname);
+		
+	if (!progdefaults.auto_prog3_pathname.empty() &&
+		 progdefaults.prog3_auto_enable)
+		start_process(progdefaults.auto_prog3_pathname);
+}
 
 // these functions are all started after Fl::run() is executing
 void delayed_startup(void *)
@@ -225,19 +285,27 @@ void delayed_startup(void *)
 	grpTalker->hide();
 #endif
 
-#if USE_XMLRPC
 	XML_RPC_Server::start(progdefaults.xmlrpc_address.c_str(), progdefaults.xmlrpc_port.c_str());
-#endif
 
 	notify_start();
 
 	if (progdefaults.usepskrep)
 		if (!pskrep_start())
 			LOG_ERROR("Could not start PSK reporter: %s", pskrep_error());
+
+	auto_start();
+
+	if (progdefaults.check_for_updates)
+		cb_mnuCheckUpdate((Fl_Widget *)0, NULL);
+
 }
 
 int main(int argc, char ** argv)
 {
+//	null_modem = new NULLMODEM;
+//	active_modem = null_modem;
+	active_modem = new NULLMODEM;
+
 	appname = argv[0];
 	string appdir;
 	string test_file_name;
@@ -313,11 +381,13 @@ int main(int argc, char ** argv)
 #ifdef __WOE32__
 		if (HomeDir.empty()) HomeDir.assign(BaseDir).append("dl-fldigi.files/");
 		if (PskMailDir.empty()) PskMailDir = BaseDir;
+//		if (DATA_dir.empty()) DATA_dir.assign(BaseDir).append("DATA.files/");
 		if (NBEMS_dir.empty()) NBEMS_dir.assign(BaseDir).append("NBEMS.files/");
 		if (FLMSG_dir.empty()) FLMSG_dir_default = NBEMS_dir;
 #else
 		if (HomeDir.empty()) HomeDir.assign(BaseDir).append(".dl-fldigi/");
 		if (PskMailDir.empty()) PskMailDir = BaseDir;
+//		if (DATA_dir.empty()) DATA_dir.assign(BaseDir).append("data/");
 		if (NBEMS_dir.empty()) NBEMS_dir.assign(BaseDir).append(".nbems/");
 		if (FLMSG_dir.empty()) FLMSG_dir_default = NBEMS_dir;
 #endif
@@ -344,6 +414,7 @@ int main(int argc, char ** argv)
 	}
 	checkdirectories();
 	check_nbems_dirs();
+	check_data_dir();
 
 	try {
 		debug::start(string(HomeDir).append("status_log.txt").c_str());
@@ -357,7 +428,6 @@ int main(int argc, char ** argv)
 	}
 
 	LOG_INFO("appname: %s", appname.c_str());
-	LOG_INFO("Test file %p", test_file);
 	if (NBEMSapps_dir)
 		LOG_INFO("%s present", test_file_name.c_str());
 	else
@@ -373,8 +443,10 @@ int main(int argc, char ** argv)
 	LOG_INFO("WrapDir: %s", WrapDir.c_str());
 	LOG_INFO("TalkDir: %s", TalkDir.c_str());
 	LOG_INFO("TempDir: %s", TempDir.c_str());
+	LOG_INFO("KmlDir: %s", KmlDir.c_str());
 	LOG_INFO("PskMailDir: %s", PskMailDir.c_str());
 
+	LOG_INFO("DATA_dir: %s", DATA_dir.c_str());
 	LOG_INFO("NBEMS_dir: %s", NBEMS_dir.c_str());
 	LOG_INFO("ARQ_dir: %s", ARQ_dir.c_str());
 	LOG_INFO("ARQ_files_dir: %s", ARQ_files_dir.c_str());
@@ -403,14 +475,7 @@ int main(int argc, char ** argv)
 	xmlfname = HomeDir;
 	xmlfname.append("rig.xml");
 
-#if !defined(__WOE32__) && !defined(__APPLE__)
-   	txmsgid = msgget( (key_t) progdefaults.tx_msgid, 0666 );
-#else
-	txmsgid = -1;
-#endif
-
 	checkTLF();
-
 
 	Fl::lock();  // start the gui thread!!
 	Fl::visual(FL_RGB); // insure 24 bit color operation
@@ -465,12 +530,9 @@ int main(int argc, char ** argv)
 
 	FSEL::create();
 
-	make_colorsfonts();
 #if FLDIGI_FLTK_API_MAJOR == 1 && FLDIGI_FLTK_API_MINOR < 3
-		CHARSETlabel->hide();
 		CHARSETstatus->hide();
 #else
-		CHARSETlabel->show();
 		CHARSETstatus->show();
 #endif
 	populate_charset_menu();
@@ -508,6 +570,11 @@ int main(int argc, char ** argv)
 	create_logbook_dialogs();
 	LOGBOOK_colors_font();
 
+	if( progdefaults.kml_save_dir.empty() ) {
+		progdefaults.kml_save_dir = KmlDir ;
+	}
+	kml_init(true);
+
 // OS X will prevent the main window from being resized if we change its
 // size *after* it has been shown. With some X11 window managers, OTOH,
 // the main window will not be restored at its exact saved position if
@@ -538,11 +605,14 @@ int main(int argc, char ** argv)
 
 	int ret = Fl::run();
 
-	arq_close();
+	return ret;
+}
 
-#if USE_XMLRPC
+void exit_process() {
+
+	KmlServer::Exit();
+	arq_close();
 	XML_RPC_Server::stop();
-#endif
 
 	if (progdefaults.usepskrep)
 		pskrep_stop();
@@ -554,7 +624,6 @@ int main(int argc, char ** argv)
 
 	FSEL::destroy();
 
-	return ret;
 }
 
 void generate_option_help(void) {
@@ -621,7 +690,6 @@ void generate_option_help(void) {
 	     << "    Look for wrap_auto_file files in DIRECTORY\n"
 	     << "    The default is " << FLMSG_dir_default << "WRAP/auto/" << "\n\n"
 
-#if USE_XMLRPC
 	     << "  --xmlrpc-server-address HOSTNAME\n"
 	     << "    Set the XML-RPC server address\n"
 	     << "    The default is: " << progdefaults.xmlrpc_address << "\n\n"
@@ -634,7 +702,6 @@ void generate_option_help(void) {
 	     << "    Allow only the methods whose names don't match REGEX\n\n"
 	     << "  --xmlrpc-list\n"
 	     << "    List all available methods\n\n"
-#endif
 
 #if BENCHMARK_MODE
 	     << "  --benchmark-modem ID\n"
@@ -696,6 +763,12 @@ void generate_option_help(void) {
 
 	     << "  --debug-level LEVEL\n"
 	     << "    Set the event log verbosity\n\n"
+
+	     << "  --debug-pskmail\n"
+	     << "    Enable logging for pskmail / arq events\n\n"
+
+	     << "  --debug-audio\n"
+	     << "    Enable logging for sound-card events\n\n"
 
 	     << "  --version\n"
 	     << "    Print version information\n\n"
@@ -782,10 +855,8 @@ int parse_args(int argc, char **argv, int& idx)
 	       OPT_FLMSG_DIR,
 	       OPT_AUTOSEND_DIR,
 
-#if USE_XMLRPC
 	       OPT_CONFIG_XMLRPC_ADDRESS, OPT_CONFIG_XMLRPC_PORT,
 	       OPT_CONFIG_XMLRPC_ALLOW, OPT_CONFIG_XMLRPC_DENY, OPT_CONFIG_XMLRPC_LIST,
-#endif
 
 #if BENCHMARK_MODE
 	       OPT_BENCHMARK_MODEM, OPT_BENCHMARK_AFC, OPT_BENCHMARK_SQL, OPT_BENCHMARK_SQLEVEL,
@@ -799,12 +870,12 @@ int parse_args(int argc, char **argv, int& idx)
 #if USE_PORTAUDIO
                OPT_FRAMES_PER_BUFFER,
 #endif
-	       OPT_NOISE, OPT_DEBUG_LEVEL,
+	       OPT_NOISE, OPT_DEBUG_LEVEL, OPT_DEBUG_PSKMAIL, OPT_DEBUG_AUDIO,
                OPT_EXIT_AFTER,
                OPT_DEPRECATED, OPT_HELP, OPT_VERSION, OPT_BUILD_INFO };
 
-	const char shortopts[] = ":";
-	static struct option longopts[] = {
+	static const char shortopts[] = ":";
+	static const struct option longopts[] = {
 #ifndef __WOE32__
 		{ "rx-ipc-key",	   1, 0, OPT_RX_IPC_KEY },
 		{ "tx-ipc-key",	   1, 0, OPT_TX_IPC_KEY },
@@ -819,13 +890,11 @@ int parse_args(int argc, char **argv, int& idx)
 
 		{ "cpu-speed-test", 0, 0, OPT_SHOW_CPU_CHECK },
 
-#if USE_XMLRPC
 		{ "xmlrpc-server-address", 1, 0, OPT_CONFIG_XMLRPC_ADDRESS },
 		{ "xmlrpc-server-port",    1, 0, OPT_CONFIG_XMLRPC_PORT },
 		{ "xmlrpc-allow",          1, 0, OPT_CONFIG_XMLRPC_ALLOW },
 		{ "xmlrpc-deny",           1, 0, OPT_CONFIG_XMLRPC_DENY },
 		{ "xmlrpc-list",           0, 0, OPT_CONFIG_XMLRPC_LIST },
-#endif
 
 #if BENCHMARK_MODE
 		{ "benchmark-modem", 1, 0, OPT_BENCHMARK_MODEM },
@@ -855,6 +924,8 @@ int parse_args(int argc, char **argv, int& idx)
 
 		{ "noise", 0, 0, OPT_NOISE },
 		{ "debug-level",   1, 0, OPT_DEBUG_LEVEL },
+		{ "debug-pskmail", 0, 0, OPT_DEBUG_PSKMAIL },
+		{ "debug-audio", 0, 0, OPT_DEBUG_AUDIO },
 
 		{ "help",	   0, 0, OPT_HELP },
 		{ "version",	   0, 0, OPT_VERSION },
@@ -934,7 +1005,6 @@ int parse_args(int argc, char **argv, int& idx)
 		}
 			break;
 
-#if USE_XMLRPC
 		case OPT_CONFIG_XMLRPC_ADDRESS:
 			progdefaults.xmlrpc_address = optarg;
 			break;
@@ -956,22 +1026,19 @@ int parse_args(int argc, char **argv, int& idx)
 		case OPT_CONFIG_XMLRPC_LIST:
 			XML_RPC_Server::list_methods(cout);
 			exit(EXIT_SUCCESS);
-#endif
 
 #if BENCHMARK_MODE
 		case OPT_BENCHMARK_MODEM:
 			benchmark.modem = strtol(optarg, NULL, 10);
 			if (!(benchmark.modem >= 0 && benchmark.modem < NUM_MODES)) {
-				cerr << "Bad modem id\n";
-				exit(EXIT_FAILURE);
+				fatal_error(_("Bad modem id"));
 			}
 			break;
 
 		case OPT_BENCHMARK_FREQ:
 			benchmark.freq = strtol(optarg, NULL, 10);
 			if (benchmark.freq < 0) {
-				cerr << "Bad frequency\n";
-				exit(EXIT_FAILURE);
+				fatal_error(_("Bad frequency"));
 			}
 			break;
 
@@ -1061,6 +1128,14 @@ int parse_args(int argc, char **argv, int& idx)
 		}
 			break;
 
+		case OPT_DEBUG_PSKMAIL:
+			debug_pskmail = true;
+			break;
+
+		case OPT_DEBUG_AUDIO:
+			debug_audio = true;
+			break;
+
 		case OPT_DEPRECATED:
 			cerr << "W: the --" << longopts[longindex].name
 			     << " option has been deprecated and will be removed in a future version\n";
@@ -1127,9 +1202,6 @@ void generate_version_text(void)
 #endif
 #if USE_HAMLIB
 	s << "                   " "Hamlib " << HAMLIB_BUILD_VERSION "\n";
-#endif
-#if USE_XMLRPC
-	s << "                   " "XMLRPC-C " << XMLRPC_BUILD_VERSION "\n\n";
 #endif
 
 	s << "\nRuntime information:\n";
@@ -1283,6 +1355,21 @@ static void setup_signal_handlers(void)
 #endif
 }
 
+// Show an error dialog and print to cerr if available.
+// On win32 Fl::fatal displays its own error window.
+static void fatal_error(string sz_error)
+{
+	string s = "Fatal error!\n";
+	s.append(sz_error).append("\n").append(strerror(errno));
+
+// Win32 will display a MessageBox error message
+#if !defined(__WOE32__)
+	fl_message_font(FL_HELVETICA, FL_NORMAL_SIZE);
+	fl_alert2("%s", s.c_str());
+#endif
+	Fl::fatal(s.c_str());
+}
+
 static void checkdirectories(void)
 {
 	struct DIRS {
@@ -1302,6 +1389,8 @@ static void checkdirectories(void)
 		{ WrapDir, "wrap", 0 },
 		{ TalkDir, "talk", 0 },
 		{ TempDir, "temp", 0 },
+		{ KmlDir, "kml", 0 },
+		{ DATA_dir, "data", 0 },
 	};
 
 	int r;
@@ -1310,9 +1399,9 @@ static void checkdirectories(void)
 			fldigi_dirs[i].dir.assign(HomeDir).append(fldigi_dirs[i].suffix).append(PATH_SEP);
 
 		if ((r = mkdir(fldigi_dirs[i].dir.c_str(), 0777)) == -1 && errno != EEXIST) {
-			cerr << _("Could not make directory") << ' ' << fldigi_dirs[i].dir
-			     << ": " << strerror(errno) << '\n';
-			exit(EXIT_FAILURE);
+			string s = _("Could not make directory ");
+			s.append(fldigi_dirs[i].dir);
+			fatal_error(s);
 		}
 		else if (r == 0 && fldigi_dirs[i].new_dir_func)
 			fldigi_dirs[i].new_dir_func();
@@ -1352,9 +1441,9 @@ void check_nbems_dirs(void)
 			NBEMS_dirs[i].dir.assign(NBEMS_dir).append(NBEMS_dirs[i].suffix).append(PATH_SEP);
 
 		if ((r = mkdir(NBEMS_dirs[i].dir.c_str(), 0777)) == -1 && errno != EEXIST) {
-			cerr << _("Could not make directory") << ' ' << NBEMS_dirs[i].dir
-			     << ": " << strerror(errno) << '\n';
-			exit(EXIT_FAILURE);
+			string s = _("Could not make directory ");
+			s.append(NBEMS_dirs[i].dir);
+			fatal_error(s);
 		}
 		else if (r == 0 && NBEMS_dirs[i].new_dir_func)
 			NBEMS_dirs[i].new_dir_func();
@@ -1376,9 +1465,9 @@ void check_nbems_dirs(void)
 			FLMSG_dirs[i].dir.assign(FLMSG_dir).append(FLMSG_dirs[i].suffix).append(PATH_SEP);
 
 		if ((r = mkdir(FLMSG_dirs[i].dir.c_str(), 0777)) == -1 && errno != EEXIST) {
-			cerr << _("Could not make directory") << ' ' << FLMSG_dirs[i].dir
-			     << ": " << strerror(errno) << '\n';
-			exit(EXIT_FAILURE);
+			string s = _("Could not make directory ");
+			s.append(FLMSG_dirs[i].dir);
+			fatal_error(s);
 		}
 		else if (r == 0 && FLMSG_dirs[i].new_dir_func)
 			FLMSG_dirs[i].new_dir_func();
@@ -1387,9 +1476,16 @@ void check_nbems_dirs(void)
 	nbems_dirs_checked = true;
 }
 
-// Print an error message and exit. If stderr is not a terminal
-// show an error dialog instead. On win32 we always use Fl::fatal,
-// which displays its own error window.
+void check_data_dir(void)
+{
+	if (mkdir(DATA_dir.c_str(), 0777) == -1 && errno != EEXIST) {
+		string s = _("Could not make directory ");
+		s.append(DATA_dir);
+		fatal_error(s);
+	}
+}
+
+// Print an error message and exit.
 static void arg_error(const char* name, const char* arg, bool missing)
 {
 	ostringstream msg;
@@ -1403,23 +1499,61 @@ static void arg_error(const char* name, const char* arg, bool missing)
 	else
 		msg << "error while parsing command line\n";
 
-#ifdef __WOE32__
-	bool woe32 = true;
-#else
-	bool woe32 = false;
-#endif
-	bool tty = isatty(STDERR_FILENO);
+	msg << "See command line help for more information.";
 
-	if (tty && !woe32)
-		msg << "Try `" << name << " --help' for more information.";
-	else
-		msg << "See command line help for more information.";
-	if (tty || woe32)
-		Fl::fatal("%s", msg.str().c_str());
-	else {
-		fl_message_font(FL_HELVETICA, FL_NORMAL_SIZE);
-		fl_alert2("%s", msg.str().c_str());
+	fatal_error(msg.str());
+}
+
+/// Sets or resets the KML parameters, and loads existing files.
+void kml_init(bool load_files)
+{
+	KmlServer::GetInstance()->InitParams(
+			progdefaults.kml_command,
+			progdefaults.kml_save_dir,
+			(double)progdefaults.kml_merge_distance,
+			progdefaults.kml_retention_time,
+			progdefaults.kml_refresh_interval,
+			progdefaults.kml_balloon_style);
+
+	if(load_files) {
+		KmlServer::GetInstance()->ReloadKmlFiles();
 	}
 
-	exit(EXIT_FAILURE);
+	/// TODO: Should do this only when the locator has changed.
+	try {
+		/// One special KML object for the user.
+		CoordinateT::Pair myCoo( progdefaults.myLocator );
+
+		/// TODO: Fix this: It does not seem to create a polyline when changing the locator.
+		KmlServer::CustomDataT custData ;
+		custData.Push( "QTH", progdefaults.myQth );
+		custData.Push( "Locator", progdefaults.myLocator );
+		custData.Push( "Antenna", progdefaults.myAntenna );
+		custData.Push( "Name", progdefaults.myName );
+
+		KmlServer::GetInstance()->Broadcast(
+			"User",
+			KmlServer::UniqueEvent,
+			myCoo,
+			0.0, // Altitude.
+			progdefaults.myCall,
+			progdefaults.myLocator,
+			progdefaults.myQth,
+			custData );
+	}
+	catch( const std::exception & exc ) {
+		LOG_WARN("Cannot publish user position:%s", exc.what() );
+	}
 }
+
+/// Tests if a directory exists.
+int directory_is_created( const char * strdir )
+{
+	DIR *dir = opendir(strdir);
+	if (dir) {
+		closedir(dir);
+		return true;
+	}
+	return false;
+}
+

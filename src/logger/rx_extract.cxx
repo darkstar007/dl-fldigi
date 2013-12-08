@@ -1,7 +1,8 @@
 // ----------------------------------------------------------------------------
 // rx_extract.cxx extract delineated data stream to file
 //
-// Copyright 2009 W1HKJ, Dave Freese
+// Copyright 2013 W1HKJ, Dave Freese
+//           2013 KL4YFD, John Phelps
 //
 // This file is part of fldigi.
 //
@@ -39,6 +40,7 @@
 #include "debug.h"
 #include "icons.h"
 #include "qrunner.h"
+#include "timeops.h"
 
 using namespace std;
 
@@ -47,7 +49,7 @@ static const char *wrap_end = "[WRAP:end]";
 static const char *flmsg = "<flmsg>";
 
 static const char flamp_beg[] = ">FLAMP";
-static const char flamp_end[] = "{EOT}";
+static const char flamp_end[] = ":EOT}";
 
 #ifdef __WIN32__
 const char *txtWrapInfo = _("\
@@ -343,5 +345,90 @@ void select_flmsg_pathname()
 		txt_flmsg_pathname->value(p);
 	}
 #endif
+}
+
+// this only works on Linux and Unix
+// not Windoze or
+// OS X to find binaries in the /Applications/ directory structure
+
+bool find_pathto_exectable(string &binpath, string executable)
+{
+	size_t endindex = 0;
+
+	binpath.clear();
+
+// Get the PATH environment variable as pointer to string
+// The strings in the environment list are of the form name=value.
+// As  typically  implemented, getenv() returns a pointer to a string within 
+// the environment list.  The caller must take care not to modify this string,
+// since that would  change the environment of the process.
+//
+// The  implementation of getenv() is not required to be reentrant.  The string
+// pointed to by the return value of getenv() may be statically allocated, and 
+// can be modified by a  subsequent call to getenv(), putenv(3), setenv(3), or 
+// unsetenv(3).
+
+	char *environment = getenv("PATH");
+
+	if (environment == NULL) return false;
+
+	string env = environment;
+	string testpath = "";
+
+	char endchar = ':';
+
+	// Parse single PATH string into directories
+	while (!env.empty()) {
+		endindex = env.find(endchar);
+		testpath = env.substr(0, endindex);
+
+		testpath.append("/"); // insert linux, unix, osx OS-correct delimiter
+		testpath.append(executable); // append executable name
+
+		// Most portable way to check if a file exists: Try to open it.
+		FILE *checkexists = NULL;
+		checkexists = fopen( testpath.c_str(), "r" ); // try to open file readonly
+		if (checkexists) { // if the file successfully opened, it exists.
+			fclose(checkexists);
+			binpath = testpath;
+			return true;
+		}
+		if (endindex == string::npos)
+			env.clear();
+		else
+			env.erase(0, endindex + 1);
+	}
+	return false;
+}
+
+string select_binary_pathname(string deffilename)
+{
+#ifdef __APPLE__
+	open_recv_folder("/Applications/");
+	return "";
+#endif
+
+	string executable;
+
+#ifdef __MINGW32__
+	deffilename = "C:\\Program Files\\";
+	const char *psz = FSEL::select(_("Locate executable"), _("*.exe"), deffilename.c_str());
+#else
+	size_t p = deffilename.rfind('/');
+	if (p != string::npos) executable = deffilename.substr(p+1);
+	else executable = deffilename;
+
+	if (!executable.empty() && find_pathto_exectable(deffilename, executable))
+		return deffilename;
+
+	deffilename = "/usr/bin/";
+	const char *psz = FSEL::select(_("Locate binary"), _("*"), deffilename.c_str());
+#endif
+
+	if (psz) executable = psz;
+// do not allow recursion !!
+	if (executable.find("fldigi") != string::npos) return "";
+	return executable;
+
 }
 

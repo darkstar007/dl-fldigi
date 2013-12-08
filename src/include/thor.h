@@ -30,7 +30,6 @@
 #include "complex.h"
 #include "modem.h"
 #include "globals.h"
-#include "fft.h"
 #include "filters.h"
 #include "fftfilt.h"
 #include "dominovar.h"
@@ -42,13 +41,14 @@
 #define	THOR_POLY2	0x4f
 
 //VK2ETA high speed modes
-// NASA Galileo coefficients for viterbi encode/decode algorithms
-#define	GALILEO_K	15
-#define	GALILEO_POLY1	046321
-#define	GALILEO_POLY2	051271
+// IEEE coefficients for viterbi encode/decode algorithms
+#define	THOR_K15	15
+#define	K15_POLY1	044735
+#define	K15_POLY2	063057
 
 //#include "mfskvaricode.h"
 #include "interleave.h"
+
 #include "viterbi.h"
 
 
@@ -62,8 +62,12 @@
 #define THORSLOWPATHS 3
 #define THORFASTPATHS 5
 
+// the following constant changes if a mode with more tones than 25x4 is
+// created
+#define MAXPATHS (8 * THORFASTPATHS * THORNUMTONES )
+
 struct THORrxpipe {
-	complex vector[THORMAXFFTS * THORNUMTONES * 6];
+	cmplx vector[THORMAXFFTS * THORNUMTONES * 6];
 };
 
 class thor : public modem {
@@ -105,7 +109,7 @@ protected:
 	mbuffer<double, 0, 2>	scopedata;
 	mbuffer<double, 0, 2>	videodata;
 
-	complex currvector;
+	cmplx currvector;
 
 	int currsymbol;
 	int prev1symbol;
@@ -151,7 +155,7 @@ protected:
 
 	
 private:
-	complex	mixer(int n, const complex& in);
+	cmplx	mixer(int n, const cmplx& in);
 
 // Rx
 	void	recvchar(int c);

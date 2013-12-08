@@ -45,6 +45,7 @@
 #include "main.h"
 
 #include "misc.h"
+#include "timeops.h"
 #include "fl_digi.h"
 #include "configuration.h"
 #include "status.h"
@@ -846,7 +847,8 @@ public:
 	/// If the delay is exceeded, returns with an error message.
 	std::string send_file( const std::string & filnam, double max_seconds )
 	{
-		LOG_INFO("%s rf_carried=%lld carrier=%d", filnam.c_str(), wf->rfcarrier(), m_carrier );
+		LOG_INFO("%s rf_carried=%d carrier=%d", filnam.c_str(), 
+				static_cast<int>(wf->rfcarrier()), m_carrier );
 
 		bool is_acquired = transmit_lock_acquire(filnam, max_seconds);
 		if( ! is_acquired ) return "Timeout sending " + filnam ;
@@ -996,7 +998,7 @@ public:
 		}
 
 		double tmpCorrPrev = correlation_from_index(corr_smpl_lin, 0 );
-		double tmpCorrMax = 0.0 ;
+//		double tmpCorrMax = 0.0 ;
 		size_t local_max = 0 ;
 		bool is_growing = false ;
 
@@ -1007,7 +1009,7 @@ public:
 			bool is_growing_next = tmpCorr > tmpCorrPrev ;
 			if( is_growing && ( ! is_growing_next  ) ) {
 				local_max = i - 1 ;
-				tmpCorrMax = tmpCorr ;
+//				tmpCorrMax = tmpCorr ;
 				break ;
 			}
 			is_growing = is_growing_next ;
@@ -1237,8 +1239,8 @@ public:
 		{
 			/// Displays the messages once only.
 			if( total_img_rows != 0 ) {
-				LOG_INFO("Setting m_carrier=%d curr_rfcarr=%lld total_img_rows=%d",
-					m_carrier, curr_rfcarr, total_img_rows );
+				LOG_INFO("Setting m_carrier=%d curr_rfcarr=%d total_img_rows=%d",
+					m_carrier, static_cast<int>(curr_rfcarr), total_img_rows );
 			}
 			total_img_rows = 0 ;
 			stable_carrier = m_carrier ;
@@ -1680,14 +1682,14 @@ std::string fax_implementation::generate_filename( const char *extra_msg ) const
 	char buf_fil_nam[256] ;
 	long long tmp_fl = wf->rfcarrier() ;
 	snprintf( buf_fil_nam, sizeof(buf_fil_nam),
-		"wefax_%04d%02d%02d_%02d%02d%02d_%lld_%s.png",
+		"wefax_%04d%02d%02d_%02d%02d%02d_%d_%s.png",
 		1900 + tmp_tm.tm_year,
 		1 + tmp_tm.tm_mon,
 		tmp_tm.tm_mday,
 		tmp_tm.tm_hour,
 		tmp_tm.tm_min,
 		tmp_tm.tm_sec,
-		tmp_fl,
+		static_cast<int>(tmp_fl),
 		extra_msg );
 
 	return buf_fil_nam ;
@@ -2103,8 +2105,8 @@ void fax_implementation::rx_new_samples(const double* audio_ptr, int audio_sz)
 	for(int i=0; i<audio_sz; i++) {
 		double idx_aux = audio_ptr[i] ;
 
-		complex firin( idx_aux*m_dbl_cosine.next_value(), idx_aux*m_dbl_sine.next_value() );
-		complex firout ;
+		cmplx firin( idx_aux*m_dbl_cosine.next_value(), idx_aux*m_dbl_sine.next_value() );
+		cmplx firout ;
 
 		/// This returns zero if the filter is not yet stable.
 		/* int run_status = */ ref_fir_filt_pair.run( firin, firout );

@@ -43,6 +43,8 @@
 #include "ringbuffer.h"
 #include "qrunner.h"
 #include "debug.h"
+#include "nullmodem.h"
+#include "macros.h"
 
 #if BENCHMARK_MODE
 #  include "benchmark.h"
@@ -79,6 +81,8 @@ static int	_trx_tune;
 static ringbuffer<double> trxrb(ceil2(NUMMEMBUFS * SCBLOCKSIZE));
 static float fbuf[SCBLOCKSIZE];
 bool    bHistory = false;
+bool    bHighSpeed = false;
+static  double hsbuff[SCBLOCKSIZE];
 
 static bool trxrunning = false;
 
@@ -233,12 +237,17 @@ void trx_trx_receive_loop()
 			numread = 0;
 			while (numread < SCBLOCKSIZE && trx_state == STATE_RX)
 				numread += scard->Read(fbuf + numread, SCBLOCKSIZE - numread);
-			if (trxrb.write_space() == 0) // discard some old data
-				trxrb.read_advance(SCBLOCKSIZE);
-			trxrb.get_wv(rbvec);
+			if (bHighSpeed) {
+				for (size_t i = 0; i < numread; i++)
+					hsbuff[i] = fbuf[i];
+			} else {
+				if (trxrb.write_space() == 0) // discard some old data
+					trxrb.read_advance(SCBLOCKSIZE);
+				trxrb.get_wv(rbvec);
 			// convert to double and write to rb
-			for (size_t i = 0; i < numread; i++)
-				rbvec[0].buf[i] = fbuf[i];
+				for (size_t i = 0; i < numread; i++)
+					rbvec[0].buf[i] = fbuf[i];
+			}
 		}
 		catch (const SndException& e) {
 			scard->Close();
@@ -250,29 +259,41 @@ void trx_trx_receive_loop()
 		if (trx_state != STATE_RX)
 			break;
 
-		trxrb.write_advance(numread);
-		REQ(&waterfall::sig_data, wf, rbvec[0].buf, numread, current_samplerate);
-
-		if (!bHistory) {
-			active_modem->rx_process(rbvec[0].buf, numread);
-			if (progdefaults.rsid)
-				ReedSolomon->receive(fbuf, numread);
-			dtmf->receive(fbuf, numread);
-		}
-		else {
+		if (bHighSpeed) {
 			bool afc = progStatus.afconoff;
 			progStatus.afconoff = false;
 			QRUNNER_DROP(true);
+			if (progdefaults.rsid)
+				ReedSolomon->receive(fbuf, numread);
 			active_modem->HistoryON(true);
-			trxrb.get_rv(rbvec);
-			if (rbvec[0].len)
-				active_modem->rx_process(rbvec[0].buf, rbvec[0].len);
-			if (rbvec[1].len)
-				active_modem->rx_process(rbvec[1].buf, rbvec[1].len);
+			active_modem->rx_process(hsbuff, numread);
 			QRUNNER_DROP(false);
 			progStatus.afconoff = afc;
-			bHistory = false;
 			active_modem->HistoryON(false);
+		} else {
+			trxrb.write_advance(numread);
+			REQ(&waterfall::sig_data, wf, rbvec[0].buf, numread, current_samplerate);
+
+			if (!bHistory) {
+				active_modem->rx_process(rbvec[0].buf, numread);
+				if (progdefaults.rsid)
+					ReedSolomon->receive(fbuf, numread);
+				dtmf->receive(fbuf, numread);
+			} else {
+				bool afc = progStatus.afconoff;
+				progStatus.afconoff = false;
+				QRUNNER_DROP(true);
+				active_modem->HistoryON(true);
+				trxrb.get_rv(rbvec);
+				if (rbvec[0].len)
+					active_modem->rx_process(rbvec[0].buf, rbvec[0].len);
+				if (rbvec[1].len)
+					active_modem->rx_process(rbvec[1].buf, rbvec[1].len);
+				QRUNNER_DROP(false);
+				progStatus.afconoff = afc;
+				bHistory = false;
+				active_modem->HistoryON(false);
+			}
 		}
 	}
 	if (scard->must_close(O_RDONLY))
@@ -300,16 +321,16 @@ void trx_trx_transmit_loop()
 			return;
 		}
 
-		if (active_modem != ssb_modem) {
+		if (active_modem != ssb_modem && active_modem != anal_modem) {
 			push2talk->set(true);
 			REQ(&waterfall::set_XmtRcvBtn, wf, true);
 		}
 		active_modem->tx_init(scard);
 
-		if ((active_modem != null_modem && 
-				active_modem != ssb_modem &&
-				active_modem != wwv_modem ) && 
-				(progdefaults.TransmitRSid || progStatus.n_rsids != 0)) {
+		if (!progdefaults.DTMFstr.empty()) dtmf->send();
+
+		if ( ReedSolomon->assigned(active_modem->get_mode()) && 
+			 (progdefaults.TransmitRSid || progStatus.n_rsids != 0)) {
 			if (progStatus.n_rsids < 0) {
 				for (int i = 0; i > progStatus.n_rsids; i--) {
 					ReedSolomon->send(true);
@@ -328,8 +349,6 @@ void trx_trx_transmit_loop()
 
 		if (progStatus.n_rsids >= 0) {
 			while (trx_state == STATE_TX) {
-				if (active_modem != ssb_modem && !progdefaults.DTMFstr.empty())
-					dtmf->send();
 				try {
 					if (active_modem->tx_process() < 0)
 						trx_state = STATE_RX;
@@ -345,13 +364,10 @@ void trx_trx_transmit_loop()
 		} else
 			trx_state = STATE_RX;
 
-		if ((active_modem != null_modem && 
-				active_modem != ssb_modem &&
-				active_modem != wwv_modem ) && 
-				progdefaults.TransmitRSid &&
-				progdefaults.rsid_post &&
-				progStatus.n_rsids >= 0)
-			ReedSolomon->send(false);
+		if (ReedSolomon->assigned(active_modem->get_mode()) && 
+			progdefaults.TransmitRSid &&
+			progdefaults.rsid_post &&
+			progStatus.n_rsids >= 0) ReedSolomon->send(false);
 
 		progStatus.n_rsids = 0;
 
@@ -437,17 +453,17 @@ void *trx_loop(void *args)
 				trxrb.reset();
 			trx_signal_state();
 		}
-/*
-printf("trx state %s\n",
-trx_state == STATE_ABORT ? "abort" :
-trx_state == STATE_ENDED ? "ended" :
-trx_state == STATE_RESTART ? "restart" :
-trx_state == STATE_NEW_MODEM ? "new modem" :
-trx_state == STATE_TX ? "tx" :
-trx_state == STATE_TUNE ? "tune" :
-trx_state == STATE_RX ? "rx" :
-"unknown");
-*/
+
+		LOG_DEBUG("trx state %s",
+			trx_state == STATE_ABORT ? "abort" :
+			trx_state == STATE_ENDED ? "ended" :
+			trx_state == STATE_RESTART ? "restart" :
+			trx_state == STATE_NEW_MODEM ? "new modem" :
+			trx_state == STATE_TX ? "tx" :
+			trx_state == STATE_TUNE ? "tune" :
+			trx_state == STATE_RX ? "rx" :
+			"unknown");
+
 		switch (trx_state) {
 		case STATE_ABORT:
 			delete scard;

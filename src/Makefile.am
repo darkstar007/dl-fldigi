@@ -44,15 +44,13 @@ EXTRA_flarq_SOURCES = $(FLARQ_WIN32_RES_SRC) $(COMMON_WIN32_RES_SRC)
 dl_fldigi_SOURCES =
 flarq_SOURCES =
 
+dl_fldigi_SOURCES += $(XMLRPC_SRC)
+
 if ENABLE_HAMLIB
   dl_fldigi_SOURCES += $(HAMLIB_SRC)
 endif
 if NEED_HAMLIB_LOCATOR
   dl_fldigi_SOURCES += $(LOCATOR_SRC)
-endif
-
-if ENABLE_XMLRPC
-  dl_fldigi_SOURCES += $(XMLRPC_SRC)
 endif
 
 if ENABLE_BENCHMARK
@@ -116,13 +114,17 @@ endif
 
 install-exec-local:
 if WANT_FLDIGI
-if ENABLE_XMLRPC
 	if test -f $(srcdir)/../scripts/dl-fldigi-shell; then \
 	    $(mkinstalldirs) $(DESTDIR)/$(bindir); \
             $(INSTALL_SCRIPT) $(srcdir)/../scripts/dl-fldigi-shell $(DESTDIR)/$(bindir); \
         fi
+	if test -f $(srcdir)/../scripts/ftp_kml_files.sh; then \
+	    $(mkinstalldirs) $(DESTDIR)/$(bindir); \
+        $(INSTALL_SCRIPT) $(srcdir)/../scripts/ftp_kml_files.sh $(DESTDIR)/$(bindir); \
+	fi
 endif
-endif
+
+# TODO: xpm files should probably go to $(datadir)/pixmaps/fldigi instead of $(datadir)/pixmaps
 
 install-data-local:
 if WANT_FLDIGI
@@ -141,6 +143,26 @@ if WANT_FLDIGI
 	if test -f $(srcdir)/../data/NAVTEX_Stations.csv; then \
 	    $(mkinstalldirs) $(DESTDIR)/$(pkgdatadir); \
 	    $(INSTALL_DATA) $(srcdir)/../data/NAVTEX_Stations.csv $(DESTDIR)/$(pkgdatadir); \
+	fi
+	if test -f $(srcdir)/../data/nsd_bbsss.txt; then \
+	    $(mkinstalldirs) $(DESTDIR)/$(datadir)/fldigi; \
+	    $(INSTALL_DATA) $(srcdir)/../data/nsd_bbsss.txt $(DESTDIR)/$(pkgdatadir); \
+	fi
+	if test -f $(srcdir)/../data/station_table.txt; then \
+	    $(mkinstalldirs) $(DESTDIR)/$(datadir)/fldigi; \
+	    $(INSTALL_DATA) $(srcdir)/../data/station_table.txt $(DESTDIR)/$(pkgdatadir); \
+	fi
+	if test -f $(srcdir)/../data/ToR-Stats-SHIP.csv; then \
+	    $(mkinstalldirs) $(DESTDIR)/$(datadir)/fldigi; \
+	    $(INSTALL_DATA) $(srcdir)/../data/ToR-Stats-SHIP.csv $(DESTDIR)/$(pkgdatadir); \
+	fi
+	if test -f $(srcdir)/../data/wmo_list.txt; then \
+	    $(mkinstalldirs) $(DESTDIR)/$(datadir)/fldigi; \
+	    $(INSTALL_DATA) $(srcdir)/../data/wmo_list.txt $(DESTDIR)/$(pkgdatadir); \
+	fi
+	if test -f $(srcdir)/../kml/styles.kml; then \
+	    $(mkinstalldirs) $(DESTDIR)/$(pkgdatadir)/kml; \
+	    $(INSTALL_DATA) $(srcdir)/../kml/styles.kml $(DESTDIR)/$(pkgdatadir)/kml; \
 	fi
 endif
 if WANT_FLARQ
@@ -167,8 +189,11 @@ if WANT_FLARQ
 	rm -f $(DESTDIR)/$(datadir)/applications/flarq.desktop
 endif
 
-FLDIGI_FL_SRC = dialogs/confdialog.fl dialogs/colorsfonts.fl \
-		logbook/lgbook.fl dialogs/notifydialog.fl
+FLDIGI_FL_SRC = \
+		dialogs/confdialog.fl \
+		dialogs/notifydialog.fl \
+		dialogs/record_browse.fl \
+		logbook/lgbook.fl
 FLARQ_FL_SRC = flarq-src/arqdialogs.fl
 
 if HAVE_FLUID
@@ -228,7 +253,8 @@ hamlib-static: $(dl_fldigi_OBJECTS)
 endif
 endif
 
-TESTS = ../scripts/tests/config-h.sh ../scripts/tests/cr.sh
+tmp_srcdir_var=$(srcdir)
+TESTS = $(tmp_srcdir_var)/../scripts/tests/config-h.sh $(tmp_srcdir_var)/../scripts/tests/cr.sh
 
 if HAVE_ASCIIDOC
 $(builddir)/../doc/guide.html: $(builddir)/../doc/guide.txt
@@ -256,13 +282,13 @@ dl_fldigi_SOURCES += \
 	cw_rtty/rtty.cxx \
 	cw_rtty/view_rtty.cxx \
 	contestia/contestia.cxx \
-	dialogs/colorsfonts.cxx \
 	dialogs/confdialog.cxx \
 	dialogs/fl_digi.cxx \
 	dialogs/font_browser.cxx \
 	dialogs/Viewer.cxx \
 	dialogs/htmlstrings.cxx \
 	dialogs/notifydialog.cxx \
+	dialogs/record_browse.cxx \
 	dtmf/dtmf.cxx \
 	thor/thor.cxx \
 	thor/thorvaricode.cxx \
@@ -270,7 +296,6 @@ dl_fldigi_SOURCES += \
 	dominoex/dominovar.cxx \
 	feld/feld.cxx \
 	feld/feldfonts.cxx \
-	fft/fft.cxx \
 	fileselector/FL/Native_File_Chooser.H \
 	fileselector/Native_File_Chooser.cxx \
 	fileselector/fileselect.cxx \
@@ -285,9 +310,6 @@ dl_fldigi_SOURCES += \
 	include/FTextView.h \
 	include/FTextRXTX.h \
 	include/fileselect.h \
-	include/Fl_Text_Buffer_mod.H \
-	include/Fl_Text_Display_mod.H \
-	include/Fl_Text_Editor_mod.H \
 	include/Panel.h \
 	include/FreqControl.h \
 	include/analysis.h \
@@ -295,7 +317,6 @@ dl_fldigi_SOURCES += \
 	include/charsetdistiller.h \
 	include/charsetlist.h \
 	include/colorbox.h \
-	include/colorsfonts.h \
 	include/combo.h \
 	include/complex.h \
 	include/configuration.h \
@@ -309,7 +330,6 @@ dl_fldigi_SOURCES += \
 	include/dominoex.h \
 	include/dominovar.h \
 	include/feld.h \
-	include/fft.h \
 	include/fftfilt.h \
 	include/filters.h \
 	include/fl_digi.h \
@@ -318,7 +338,6 @@ dl_fldigi_SOURCES += \
 	include/flinput2.h \
 	include/flmisc.h \
 	include/flslider2.h \
-	include/flstring.h \
 	include/font_browser.h \
 	include/fontdef.h \
 	include/gettext.h \
@@ -333,6 +352,9 @@ dl_fldigi_SOURCES += \
 	include/jalocha/pj_lowpass3.h \
 	include/jalocha/pj_mfsk.h \
 	include/jalocha/pj_struc.h \
+	include/coordinate.h \
+	include/gfft.h \
+	include/kmlserver.h \
 	include/locator.h \
 	include/log.h \
 	include/logger.h \
@@ -355,6 +377,7 @@ dl_fldigi_SOURCES += \
 	include/newinstall.h \
 	include/notify.h \
 	include/notifydialog.h \
+	include/record_browse.h \
 	include/olivia.h \
 	include/pkg.h \
 	include/picture.h \
@@ -381,8 +404,10 @@ dl_fldigi_SOURCES += \
 	include/rsid.h \
 	include/rtty.h \
 	include/view_rtty.h \
-	include/navtex.h \
+	include/synop.h \
 	include/nullmodem.h \
+	include/record_loader.h \
+	include/record_loader_gui.h \
 	include/rx_extract.h \
 	include/speak.h \
 	include/serial.h \
@@ -469,10 +494,11 @@ dl_fldigi_SOURCES += \
 	misc/charsetdistiller.cxx \
 	misc/charsetlist.cxx \
 	misc/configuration.cxx \
+	misc/coordinate.cxx \
 	misc/debug.cxx \
 	misc/dxcc.cxx \
-	misc/flstring.c \
 	misc/icons.cxx \
+	misc/kmlserver.cxx \
 	misc/log.cxx \
 	misc/macroedit.cxx \
 	misc/macros.cxx \
@@ -484,6 +510,7 @@ dl_fldigi_SOURCES += \
 	misc/pixmaps.cxx \
 	misc/pixmaps_tango.cxx \
 	misc/re.cxx \
+	misc/record_loader.cxx \
 	misc/socket.cxx \
 	misc/stacktrace.cxx \
 	misc/status.cxx \
@@ -497,6 +524,7 @@ dl_fldigi_SOURCES += \
 	mt63/mt63.cxx \
 	mt63/mt63base.cxx \
 	navtex/navtex.cxx \
+	include/navtex.h \
 	olivia/olivia.cxx \
 	psk/psk.cxx \
 	psk/pskcoeff.cxx \
@@ -522,6 +550,7 @@ dl_fldigi_SOURCES += \
 	ssdv/ssdv_rx.cxx \
 	ssdv/rs8.c \
 	ssb/ssb.cxx \
+	synop-src/synop.cxx \
 	throb/throb.cxx \
 	trx/modem.cxx \
 	trx/nullmodem.cxx \
@@ -530,11 +559,11 @@ dl_fldigi_SOURCES += \
 	waterfall/digiscope.cxx \
 	waterfall/raster.cxx \
 	waterfall/waterfall.cxx \
-	widgets/FTextView.cxx \
-	widgets/FTextRXTX.cxx \
 	widgets/Fl_Text_Buffer_mod.cxx \
 	widgets/Fl_Text_Display_mod.cxx \
 	widgets/Fl_Text_Editor_mod.cxx \
+	widgets/FTextView.cxx \
+	widgets/FTextRXTX.cxx \
 	widgets/Panel.cxx \
 	widgets/flinput2.cxx \
 	widgets/flmisc.cxx \
@@ -594,15 +623,7 @@ dl_fldigi_SOURCES += \
 EXTRA_dl_fldigi_SOURCES += \
 	blank/blank.cxx \
 	blank/blank.h \
-	fileselector/FL/Native_File_Chooser_FLTK.H \
-	fileselector/FL/Native_File_Chooser_MAC.H \
-	fileselector/FL/Native_File_Chooser_WIN32.H \
-	fileselector/Native_File_Chooser_FLTK.cxx \
-	fileselector/Native_File_Chooser_WIN32.cxx \
-	fileselector/Native_File_Chooser_MAC.cxx \
 	fileselector/flnfc_common.cxx \
-	fileselector/fileselect_1_1.cxx \
-	fileselector/fileselect_1_3.cxx \
 	feld/Feld7x7-14.cxx \
 	feld/Feld7x7n-14.cxx \
 	feld/FeldDx-14.cxx \
@@ -618,12 +639,9 @@ EXTRA_dl_fldigi_SOURCES += \
 	feld/FeldStyl-14.cxx \
 	feld/FeldVert-14.cxx \
 	feld/FeldWide-14.cxx \
-	include/Fl_Text_Buffer_mod_1_1.H \
-	include/Fl_Text_Buffer_mod_1_3.H \
-	include/Fl_Text_Display_mod_1_1.H \
-	include/Fl_Text_Display_mod_1_3.H \
-	include/Fl_Text_Editor_mod_1_1.H \
-	include/Fl_Text_Editor_mod_1_3.H \
+	include/Fl_Text_Buffer_mod.H \
+	include/Fl_Text_Display_mod.H \
+	include/Fl_Text_Editor_mod.H \
 	mfsk/mfsk-pic.cxx \
 	mt63/alias_1k.dat \
 	mt63/alias_2k.dat \
@@ -634,12 +652,6 @@ EXTRA_dl_fldigi_SOURCES += \
 	rsid/rsid_defs.cxx \
 	trx/tune.cxx \
 	dialogs/guide.cxx \
-	widgets/Fl_Text_Buffer_mod_1_1.cxx \
-	widgets/Fl_Text_Buffer_mod_1_3.cxx \
-	widgets/Fl_Text_Display_mod_1_1.cxx \
-	widgets/Fl_Text_Display_mod_1_3.cxx \
-	widgets/Fl_Text_Editor_mod_1_1.cxx \
-	widgets/Fl_Text_Editor_mod_1_3.cxx \
 	libtiniconv/tiniconv.h \
 	libtiniconv/tiniconv_int.h \
 	libtiniconv/encdec/ascii.h \
@@ -751,7 +763,7 @@ flarq_SOURCES += \
 	widgets/Fl_Text_Editor_mod.cxx \
 	widgets/FTextView.cxx
 
-# Additional non-source files that we distribute
+# Additional files that we distribute
 EXTRA_DIST = \
 	$(srcdir)/../scripts/mkappbundle.sh \
 	$(srcdir)/../scripts/mkhamlibstatic.sh \
@@ -765,6 +777,9 @@ EXTRA_DIST = \
 	$(srcdir)/../data/dl-fldigi.desktop \
 	$(srcdir)/../data/dl-fldigi-hab.desktop \
 	$(srcdir)/../data/NAVTEX_Stations.csv \
+	$(srcdir)/../data/nsd_bbsss.txt \
+	$(srcdir)/../data/station_table.txt \
+	$(srcdir)/../data/ToR-Stats-SHIP.csv \
 	$(srcdir)/../data/mac/Info.plist.in \
 	$(srcdir)/../data/mac/fldigi.icns \
 	$(srcdir)/../data/win32/fldigi.ico \
@@ -772,6 +787,9 @@ EXTRA_DIST = \
 	$(srcdir)/../data/flarq.xpm \
 	$(srcdir)/../data/mac/flarq.icns \
 	$(srcdir)/../data/win32/flarq.ico \
+	$(srcdir)/synop-src/synop_tool.cxx \
+	$(srcdir)/synop-src/README \
+	$(srcdir)/synop-src/Makefile \
 	$(FLDIGI_FL_SRC) \
 	$(FLARQ_FL_SRC)
 

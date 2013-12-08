@@ -7,6 +7,8 @@
 //		Leigh L. Klotz, Jr., WA5ZNU
 // Copyright (C) 2007-2010
 //		Stelios Bounanos, M0GLD
+// Copyright (C) 2013
+//		Remi Chateauneu, F4ECW
 //
 // This file is part of fldigi.
 //
@@ -57,6 +59,7 @@
 #  include <dirent.h>
 #  include <limits.h>
 #  include <errno.h>
+#  include <glob.h>
 #endif
 #ifdef __APPLE__
 #  include <glob.h>
@@ -73,16 +76,7 @@
 // to
 //#  if defined(WIN32) && !defined(__CYGWIN__) && !defined(__WATCOMC__) && !defined(__WOE32__)
 
-#ifdef __MINGW32__
-#	if FLDIGI_FLTK_API_MAJOR == 1 && FLDIGI_FLTK_API_MINOR < 3
-#		undef dirent
-#		include <dirent.h>
-#	else
-#		include <dirent.h>
-#	endif
-#else
-#	include <dirent.h>
-#endif
+#include <dirent.h>
 
 using namespace std;
 
@@ -98,32 +92,6 @@ const char *szBands[] = {
 	"1830", "3580", "7030", "7070", "10138",
 	"14070", "18100", "21070", "21080", "24920", "28070", "28120", 0};
 
-#if FLDIGI_FLTK_API_MAJOR == 1 && FLDIGI_FLTK_API_MINOR == 1
-// Define stream I/O operators for non-builtin types.
-// Right now we have: Fl_Color, Fl_Font, RGB, and RGBI
-ostream& operator<<(ostream& out, const Fl_Color& c)
-{
-	return out << static_cast<int>(c);
-}
-istream& operator>>(istream& in, Fl_Color& c)
-{
-	int i;
-	in >> i;
-	c = static_cast<Fl_Color>(i);
-	return in;
-}
-ostream& operator<<(ostream& out, const Fl_Font& f)
-{
-	return out << static_cast<int>(f);
-}
-istream& operator>>(istream& in, Fl_Font& f)
-{
-	int i;
-	in >> i;
-	f = static_cast<Fl_Font>(i);
-	return in;
-}
-#endif
 ostream& operator<<(ostream& out, const RGB& rgb)
 {
 	return out << (int)rgb.R << ' ' << (int)rgb.G << ' ' << (int)rgb.B;
@@ -229,8 +197,6 @@ public:
 	string& str;
 };
 
-#include "re.h"
-
 // Special handling for mode bitsets
 template <>
 class tag_elem<mode_set_t> : public tag_base
@@ -247,20 +213,19 @@ public:
 	}
 	void read(const char* data)
 	{
-		re_t mode_name_re("([^,]+)", REG_EXTENDED);
-		int end;
-
 		modes.set();
-		while (mode_name_re.match(data)) {
-			const char* name = mode_name_re.submatch(1).c_str();
+		for( ; data ; )
+		{
+			const char * comma = strchr( data, ',' );
+			size_t tok_len = comma ? comma - data : strlen(data);
+
 			for (size_t i = 0; i < modes.size(); i++) {
-				if (!strcmp(mode_info[i].name, name)) {
+				if (!strncmp(mode_info[i].name, data, tok_len )) {
 					modes.set(i, 0);
 					break;
 				}
 			}
-			mode_name_re.suboff(0, NULL, &end);
-			data += end;
+			data = comma ? comma + 1 : NULL ;
 		}
 	}
 	mode_set_t& modes;
@@ -388,7 +353,7 @@ bool configuration::readDefaultsXML()
 			tag_map[tag_list[i]->tag] = tag_list[i];
 
 	// parse the xml buffer
-	tag_map_t::const_iterator i;
+	tag_map_t::const_iterator i = tag_map.end();
 	while(xml->read()) {
 		switch(xml->getNodeType()) {
 		case EXN_TEXT:
@@ -458,8 +423,6 @@ void configuration::loadDefaults()
 	btnContestia_8bit->value(contestia8bit);
 
 	chkDominoEX_FEC->value(DOMINOEX_FEC);
-
-	btnmt63_interleave->value(mt63_interleave == 64);
 
 	Fl_Tooltip::enable(tooltips);
 }
@@ -584,10 +547,6 @@ int configuration::setDefaults()
 	inpRIGdev->value(HamRigDevice.c_str());
 	mnuBaudRate->value(HamRigBaudrate);
 
-#if !USE_XMLRPC
-	tabXMLRPC->parent()->remove(*tabXMLRPC);
-#endif
-
 	inpXmlRigDevice->value(XmlRigDevice.c_str());
 	mnuXmlRigBaudrate->value(XmlRigBaudrate);
 
@@ -695,7 +654,6 @@ int configuration::setDefaults()
 	chkID_SMALL->value(ID_SMALL);
 
 	wf->setPrefilter(wfPreFilter);
-	valLatency->value(latency);
 	btnWFaveraging->value(WFaveraging);
 
 	memcpy(&palette[0], &cfgpal0, sizeof(palette[0]));
@@ -817,7 +775,6 @@ void configuration::initInterface()
 		}
 #endif
 	} else if (chkUSEXMLRPCis) {
-		wf->setXMLRPC(1);
 		if (rigCAT_init(false)) {
 			LOG_VERBOSE("%s", "using XMLRPC");
 			wf->USB(true);
@@ -903,12 +860,9 @@ static bool open_serial(const char* dev)
 
 void configuration::testCommPorts()
 {
-	int retval;
-
 	inpTTYdev->clear();
 	inpRIGdev->clear();
 	inpXmlRigDevice->clear();
-	inpGPSdev->clear();
 
 #ifndef PATH_MAX
 #  define PATH_MAX 1024
@@ -921,57 +875,12 @@ void configuration::testCommPorts()
 	char ttyname[PATH_MAX + 1];
 #endif
 
-#ifdef __linux__
-	bool ret = false;
-	DIR* sys = NULL;
-	char cwd[PATH_MAX] = { '.', '\0' };
-	if (getcwd(cwd, sizeof(cwd)) == NULL || chdir("/sys/class/tty") == -1 ||
-	    (sys = opendir(".")) == NULL)
-		goto out;
-
-	ssize_t len;
-	struct dirent* dp;
-	while ((dp = readdir(sys))) {
-#  ifdef _DIRENT_HAVE_D_TYPE
-		if (dp->d_type != DT_LNK)
-			continue;
-#  endif
-		if ((len = readlink(dp->d_name, ttyname, sizeof(ttyname)-1)) == -1)
-			continue;
-		ttyname[len] = '\0';
-		if (!strstr(ttyname, "/devices/virtual/")) {
-			snprintf(ttyname, sizeof(ttyname), "/dev/%s", dp->d_name);
-			if (stat(ttyname, &st) == -1 || !S_ISCHR(st.st_mode))
-				continue;
-			LOG_INFO("Found serial port %s", ttyname);
-			inpTTYdev->add(ttyname);
-#if USE_HAMLIB
-			inpRIGdev->add(ttyname);
-#endif
-			inpXmlRigDevice->add(ttyname);
-			inpGPSdev->add(ttyname);
-		}
-	}
-	ret = true;
-
-out:
-	if (sys)
-		closedir(sys);
-	retval = chdir(cwd);
-	if (ret) // do we need to fall back to the probe code below?
-		return;
-#endif // __linux__
-
-	// TODO: will the mingw probing work for cygwin too?
-
 	const char* tty_fmt[] = {
 #if defined(__linux__)
 		"/dev/ttyS%u",
 		"/dev/ttyUSB%u",
 		"/dev/usb/ttyUSB%u"
-#elif defined(__FreeBSD__)
-		"/dev/ttyd%u"
-#elif defined(__OpenBSD__) || defined(__NetBSD__)
+#elif defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
 		"/dev/tty%2.2u"
 #elif defined(__CYGWIN__)
 		"/dev/ttyS%u"
@@ -985,12 +894,27 @@ out:
 
 #if defined(__WOE32__)
 #  define TTY_MAX 255
-#elif defined(__APPLE__)
-	glob_t gbuf;
 #elif defined(__OpenBSD__) || defined(__NetBSD__)
 #  define TTY_MAX 4
 #else
 #  define TTY_MAX 8
+#endif
+
+#ifdef __linux__
+	glob_t gbuf;
+	glob("/dev/serial/by-id/*", 0, NULL, &gbuf);
+	for (size_t j = 0; j < gbuf.gl_pathc; j++) {
+		if ( !(stat(gbuf.gl_pathv[j], &st) == 0 && S_ISCHR(st.st_mode)) ||
+		     strstr(gbuf.gl_pathv[j], "modem") )
+			continue;
+		LOG_INFO("Found serial port %s", gbuf.gl_pathv[j]);
+		inpTTYdev->add(gbuf.gl_pathv[j]);
+#  if USE_HAMLIB
+		inpRIGdev->add(gbuf.gl_pathv[j]);
+#  endif
+		inpXmlRigDevice->add(gbuf.gl_pathv[j]);
+	}
+	globfree(&gbuf);
 #endif
 
 	for (size_t i = 0; i < sizeof(tty_fmt)/sizeof(*tty_fmt); i++) {
@@ -1020,6 +944,7 @@ out:
 			inpGPSdev->add(ttyname);
 		}
 #else // __APPLE__
+		glob_t gbuf;
 		glob(tty_fmt[i], 0, NULL, &gbuf);
 		for (size_t j = 0; j < gbuf.gl_pathc; j++) {
 			if ( !(stat(gbuf.gl_pathv[j], &st) == 0 && S_ISCHR(st.st_mode)) ||

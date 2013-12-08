@@ -47,9 +47,14 @@ There is NO WARRANTY, to the extent permitted by law.\n\
 <H4>Programmers:</H4>\n\
 &nbsp; &nbsp; &nbsp;Dave Freese, W1HKJ<br>\n\
 &nbsp; &nbsp; &nbsp;Stelios Bounanos, M0GLD<br>\n\
-&nbsp; &nbsp; &nbsp;Leigh Klotz, WA5ZNU<br>\n\
 &nbsp; &nbsp; &nbsp;Rem\355 Chateauneu, F4ECW<br>\n\
+&nbsp; &nbsp; &nbsp;John Douyere, VK2ETA<br>\n\
+&nbsp; &nbsp; &nbsp;Stefan Fendt, DO2SMF<br>\n\
+&nbsp; &nbsp; &nbsp;Leigh Klotz, WA5ZNU<br>\n\
+&nbsp; &nbsp; &nbsp;John Phelps, KL4YFD<br>\n\
+&nbsp; &nbsp; &nbsp;Andrej Lajovic, S57LN\n\
 <H4>Localization:</H4>\n\
+&nbsp; &nbsp; &nbsp;German:  Marc Richter,        DF2MR<br>\n\
 &nbsp; &nbsp; &nbsp;French:  St\351phane Fillod,     F8CFE<br>\n\
 &nbsp; &nbsp; &nbsp;Italian: Pierfrancesco Caci,  IK5PVX<br>\n\
 &nbsp; &nbsp; &nbsp;Polish:  Roman Bagiński,      SP4JEU<br>\n\
