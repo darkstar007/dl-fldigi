@@ -1,7 +1,7 @@
 # Polish translations for fldigi package
 # Copyright (C) 2008 Dave Freese, Stelios Bounanos, Leigh Klotz, and others
 # This file is distributed under the same license as the fldigi package.
-#
+# 
 msgid ""
 msgstr ""
 "Project-Id-Version: fldigi 3.22.0 ALPHA series\n"
@@ -1002,11 +1002,12 @@ msgid "*"
 msgstr ""
 
 #: src/logger/speak.cxx:42
+#, fuzzy
 msgid ""
 "Save all received text, one character at a time to the following file:\n"
 "\n"
-"    fldigi.files\\talk\\textout.txt (Windows)\n"
-"    ~/.fldigi/talk/textout.txt (Linux, OS X, Free BSD)"
+"    dl-fldigi.files\\talk\\textout.txt (Windows)\n"
+"    ~/.dl-fldigi/talk/textout.txt (Linux, OS X, Free BSD)"
 msgstr ""
 "Zapisz wszystkie otrzymane teksty, jeden znak na raz do następującego "
 "pliku:\n"
@@ -1027,11 +1028,12 @@ msgid "Always USB"
 msgstr "Zawsze USB"
 
 #: src/misc/configuration.cxx:698
+#, fuzzy
 msgid ""
 "Reset all options to their default values?\n"
 "\n"
 "Reset options will take effect at the next start\n"
-"Files: fldigi_def.xml and fldigi.prefs will be deleted!\n"
+"Files: dl-fldigi_def.xml and dl-fldigi.prefs will be deleted!\n"
 msgstr ""
 "Resetowac wszystkie opcje do ich wartosci domyslnych?\n"
 "Zresetowane opcje zostaną uwzględnione przy następnym uruchomieniu\n"

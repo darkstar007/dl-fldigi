@@ -981,11 +981,12 @@ msgid "*"
 msgstr "*"
 
 #: src/logger/speak.cxx:42
+#, fuzzy
 msgid ""
 "Save all received text, one character at a time to the following file:\n"
 "\n"
-"    fldigi.files\\talk\\textout.txt (Windows)\n"
-"    ~/.fldigi/talk/textout.txt (Linux, OS X, Free BSD)"
+"    dl-fldigi.files\\talk\\textout.txt (Windows)\n"
+"    ~/.dl-fldigi/talk/textout.txt (Linux, OS X, Free BSD)"
 msgstr ""
 "Empfangenen Text speichern, Zeichenweise in folgende Datei:\n"
 "\n"
@@ -1005,11 +1006,12 @@ msgid "Always USB"
 msgstr "Immer USB"
 
 #: src/misc/configuration.cxx:698
+#, fuzzy
 msgid ""
 "Reset all options to their default values?\n"
 "\n"
 "Reset options will take effect at the next start\n"
-"Files: fldigi_def.xml and fldigi.prefs will be deleted!\n"
+"Files: dl-fldigi_def.xml and dl-fldigi.prefs will be deleted!\n"
 msgstr ""
 "Alle Einstellungen auf Standard zurücksetzen?\n"
 "\n"
