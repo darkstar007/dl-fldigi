@@ -2098,7 +2098,7 @@ int SoundFile::Open(int mode, int freq)
 		  if (S_ISDIR(mystat.st_mode)) {
 		       std::cout << "That directory tasted bad!" << std::endl;
 		  } else {
-                       fd = open(fname, O_RDONLY | O_NONBLOCK);
+                       fd = open(fname, O_RDONLY); // | O_NONBLOCK);
 		       if (fd < 0) {
 			    perror("File permissions?:");
 		       } else {

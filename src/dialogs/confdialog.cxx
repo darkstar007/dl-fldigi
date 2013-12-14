@@ -2856,6 +2856,9 @@ Fl_Choice *selBaud=(Fl_Choice *)0;
 
 static void cb_selBaud(Fl_Choice* o, void*) {
   progdefaults.rtty_baud = o->value();
+    //"45|45.45|50|56|75|100|110|150|200|300|600|1200";
+const double BAUD[]  = {45, 45.45, 50, 56, 75, 100, 110, 150, 200, 300, 600, 1200};
+progdefaults.RTTY_BW = BAUD[progdefaults.rtty_baud] * 2;
 resetRTTY();
 progdefaults.changed = true;
 }
@@ -5235,7 +5238,7 @@ Fl_Double_Window* ConfigureDialog() {
   Fl_Double_Window* w;
   font_browser = new Font_Browser;
   static const char szShifts[]  = "23|85|160|170|182|200|240|350|425|_850|Custom";
-  static const char szBauds[]  = "45|45.45|50|56|75|100|110|150|200|300";
+  static const char szBauds[]  = "45|45.45|50|56|75|100|110|150|200|300|600|1200";
   static const char szSelBits[] = "5 (baudot)|7 (ascii)|8 (ascii)";
   static const char szParity[]  = "none|even|odd|zero|one";
   static const char szStopBits[] = "1|1.5|2";

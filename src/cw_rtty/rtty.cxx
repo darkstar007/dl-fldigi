@@ -1,4 +1,4 @@
-// ----------------------------------------------------------------------------
+    // ----------------------------------------------------------------------------
 // rtty.cxx  --  RTTY modem
 //
 // Copyright (C) 2012
@@ -193,21 +193,23 @@ rtty::~rtty()
 
 void rtty::reset_filters()
 {
+    printf("reseting Filter for Baud %f, %f\n", rtty_baud, samplerate);  // print dot length
 	int filter_length = 1024;
 
-	if (mark_filt) {
-		mark_filt->rtty_filter(rtty_baud/samplerate);
-	} else {
-		mark_filt = new fftfilt(rtty_baud/samplerate, filter_length);
-		mark_filt->rtty_filter(rtty_baud/samplerate);
-     }
+    
+        if (mark_filt) {
+            mark_filt->rtty_filter(rtty_baud/samplerate);
+        } else {
+            mark_filt = new fftfilt(rtty_baud/samplerate, filter_length);
+            mark_filt->rtty_filter(rtty_baud/samplerate);
+         }
 
-	if (space_filt) {
-		space_filt->rtty_filter(rtty_baud/samplerate);
-	} else {
-		space_filt = new fftfilt(rtty_baud/samplerate, filter_length);
-		space_filt->rtty_filter(rtty_baud/samplerate);
-     }
+        if (space_filt) {
+            space_filt->rtty_filter(rtty_baud/samplerate);
+        } else {
+            space_filt = new fftfilt(rtty_baud/samplerate, filter_length);
+            space_filt->rtty_filter(rtty_baud/samplerate);
+         }
 }
 
 void rtty::restart()
@@ -497,7 +499,8 @@ bool rtty::rx(bool bit) // original modified for probability test
 						if (c == '\r' && lastchar == '\r');
 						else if (c == '\n' && lastchar == '\n');
 						else
-							put_rx_char(progdefaults.rx_lowercase ? tolower(c) : c);
+							//put_rx_char(progdefaults.rx_lowercase ? tolower(c) : c);
+                            put_rx_char(progdefaults.rx_lowercase ? tolower(c) : c, FTextBase::RECV, true);
 						lastchar = c;
 					}
 					flag = true;
