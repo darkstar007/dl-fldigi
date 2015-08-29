@@ -5171,8 +5171,9 @@ msgstr "Talker"
 msgid "Connect/disconnect to Talker socket server"
 msgstr "Polacz / Rozlacz do gniazda serwera Talker "
 
-#: src/dialogs/confdialog.cxx:9168
-msgid "Auto connect when fldigi opens (server must be up)"
+#: src/dialogs/confdialog.cxx:7612
+#, fuzzy
+msgid "Auto connect when dl-fldigi opens (server must be up)"
 msgstr "Aktywuj podczas startu fldigi (serwer musi byc uruchomiony )"
 
 #: src/dialogs/confdialog.cxx:9175

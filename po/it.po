@@ -5237,10 +5237,12 @@ msgstr "Talker"
 msgid "Connect/disconnect to Talker socket server"
 msgstr "Connetti/disconnetti il socket del server Talker"
 
-#: src/dialogs/confdialog.cxx:9168
-msgid "Auto connect when fldigi opens (server must be up)"
+#: src/dialogs/confdialog.cxx:7612
+#, fuzzy
+msgid "Auto connect when dl-fldigi opens (server must be up)"
 msgstr ""
-"Connetti automaticamente all'avvio di dl-fldigi (il server deve essere attivo)"
+"Connetti automaticamente all'avvio di dl-fldigi (il server deve essere "
+"attivo)"
 
 #: src/dialogs/confdialog.cxx:9175
 msgid "Capture rx text to external file"
